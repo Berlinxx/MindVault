@@ -81,12 +81,12 @@
 
         <!-- Upload File -->
         <Border Style="{StaticResource PrimaryPill}">
-          <Label Text="UPLOAD FILE" FontAttributes="Bold" FontSize="15" TextColor="White" HorizontalOptions="Center" />
+          <Label Text="UPLOAD LESSON FILE" FontAttributes="Bold" FontSize="15" TextColor="White" HorizontalOptions="Center" />
           <Border.GestureRecognizers>
             <TapGestureRecognizer Tapped="OnUploadFile" />
           </Border.GestureRecognizers>
         </Border>
-        <Label Text="(.pptx, .txt only)" FontSize="12" TextColor="#E0EEF7" HorizontalTextAlignment="Center" />
+        <Label Text="(.pdf, .docx, .pptx, .txt)" FontSize="12" TextColor="#E0EEF7" HorizontalTextAlignment="Center" />
 
         <!-- Generate cards button shown when there is content -->
         <Border x:Name="GenerateButton" Style="{StaticResource PrimaryPill}" IsVisible="False">
@@ -96,7 +96,20 @@
           </Border.GestureRecognizers>
         </Border>
         <Label x:Name="StatusLabel" Text="" FontSize="12" TextColor="#E0EEF7" />
+        <!-- Progress cue -->
+        <Grid x:Name="InlineProgress" ColumnDefinitions="*,Auto" IsVisible="False">
+          <ProgressBar x:Name="ChunkProgress" Grid.Column="0" Progress="0" HeightRequest="6" BackgroundColor="#1E6DAA" ProgressColor="#5C6BF5" />
+          <Label x:Name="ChunkLabel" Grid.Column="1" Text="" FontSize="11" TextColor="#E0EEF7" Margin="12,0,0,0" />
+        </Grid>
       </VerticalStackLayout>
     </ScrollView>
+
+    <!-- Loading overlay -->
+    <Grid x:Name="LoadingOverlay" Grid.RowSpan="2" BackgroundColor="#66000000" IsVisible="False" ZIndex="50">
+      <VerticalStackLayout HorizontalOptions="Center" VerticalOptions="Center" Spacing="12">
+        <ActivityIndicator x:Name="LoadingSpinner" IsRunning="False" Color="White" WidthRequest="48" HeightRequest="48" />
+        <Label x:Name="OverlayProgressLabel" Text="" TextColor="White" FontSize="14" HorizontalTextAlignment="Center" />
+      </VerticalStackLayout>
+    </Grid>
   </Grid>
 </ContentPage>

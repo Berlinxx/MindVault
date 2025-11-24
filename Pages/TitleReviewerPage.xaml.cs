@@ -2,6 +2,7 @@ using mindvault.Services;
 using mindvault.Utils;
 using System.Diagnostics;
 using mindvault.Data;
+using Microsoft.Maui.Controls;
 
 namespace mindvault.Pages;
 
@@ -45,5 +46,21 @@ public partial class TitleReviewerPage : ContentPage
         {
             _isCreating = false;
         }
+    }
+
+    protected override void OnAppearing()
+    {
+        base.OnAppearing();
+        _ = RunEntryAnimationAsync();
+    }
+
+    async Task RunEntryAnimationAsync()
+    {
+        try
+        {
+            await Task.Delay(50); // let layout complete
+            await mindvault.Utils.AnimHelpers.SlideFadeInAsync(Content);
+        }
+        catch { }
     }
 }

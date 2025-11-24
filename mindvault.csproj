@@ -1,87 +1,81 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
 	<PropertyGroup>
-		<TargetFrameworks>net9.0-android;net9.0-ios;net9.0-maccatalyst</TargetFrameworks>
-		<TargetFrameworks Condition="$([MSBuild]::IsOSPlatform('windows'))">$(TargetFrameworks);net9.0-windows10.0.19041.0</TargetFrameworks>
-		<!-- Uncomment to also build the tizen app. You will need to install tizen by following this: https://github.com/Samsung/Tizen.NET -->
-		<!-- <TargetFrameworks>$(TargetFrameworks);net9.0-tizen</TargetFrameworks> -->
-
-		<!-- Note for MacCatalyst:
-		The default runtime is maccatalyst-x64, except in Release config, in which case the default is maccatalyst-x64;maccatalyst-arm64.
-		When specifying both architectures, use the plural <RuntimeIdentifiers> instead of the singular <RuntimeIdentifier>.
-		The Mac App Store will NOT accept apps with ONLY maccatalyst-arm64 indicated;
-		either BOTH runtimes must be indicated or ONLY macatalyst-x64. -->
-		<!-- For example: <RuntimeIdentifiers>maccatalyst-x64;maccatalyst-arm64</RuntimeIdentifiers> -->
-
+		<TargetFrameworks>net9.0-android;net9.0-ios;net9.0-maccatalyst;net9.0-windows10.0.19041.0</TargetFrameworks>
 		<OutputType>Exe</OutputType>
 		<RootNamespace>mindvault</RootNamespace>
 		<UseMaui>true</UseMaui>
 		<SingleProject>true</SingleProject>
 		<ImplicitUsings>enable</ImplicitUsings>
 		<Nullable>enable</Nullable>
-
-		<!-- Display name -->
 		<ApplicationTitle>mindvault</ApplicationTitle>
-
-		<!-- App Identifier -->
 		<ApplicationId>com.companyname.mindvault</ApplicationId>
-
-		<!-- Versions -->
 		<ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
 		<ApplicationVersion>1</ApplicationVersion>
-
-		<!-- To develop, package, and publish an app to the Microsoft Store, see: https://aka.ms/MauiTemplateUnpackaged -->
 		<WindowsPackageType>None</WindowsPackageType>
-
 		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'">15.0</SupportedOSPlatformVersion>
 		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'maccatalyst'">15.0</SupportedOSPlatformVersion>
 		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">21.0</SupportedOSPlatformVersion>
 		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</SupportedOSPlatformVersion>
 		<TargetPlatformMinVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</TargetPlatformMinVersion>
-		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'tizen'">6.5</SupportedOSPlatformVersion>
+		<ErrorOnDuplicatePublishOutputFiles>false</ErrorOnDuplicatePublishOutputFiles>
+		<MauiEnableLinking>false</MauiEnableLinking>
 	</PropertyGroup>
 
 	<ItemGroup>
-		<!-- App Icon - Using SVG for better quality and adaptive icon support -->
-		<MauiIcon Include="Resources\AppIcon\app_icon.svg" />
-
-		<!-- Splash Screen -->
+		<!-- Use PNG app icon and provide Android adaptive icon layers. -->
+		<!-- Foreground: the provided app_icon.png (should include transparency for best results) -->
+		<!-- Background: a solid color used behind the foreground on supported launchers -->
+		<MauiIcon Include="Resources\AppIcon\app_icon.png"
+		          AndroidAdaptiveIconForeground="Resources\AppIcon\app_icon.png"
+		          AndroidAdaptiveIconBackground="#1A86D9" />
 		<MauiSplashScreen Include="Resources\Splash\mindvault_logo.jpg" Color="#1A86D9" BaseSize="256,256" />
-		
-		<!-- Images -->
 		<MauiImage Include="Resources\Images\*" />
 		<MauiImage Update="Resources\Images\dotnet_bot.png" Resize="True" BaseSize="300,185" />
-		
-		<!-- Custom Fonts -->
 		<MauiFont Include="Resources\Fonts\*" />
-
-		<!-- Raw Assets (also remove the "Resources\Raw" prefix) -->
 		<MauiAsset Include="Resources\Raw\**" LogicalName="%(RecursiveDir)%(Filename)%(Extension)" />
 	</ItemGroup>
 
 	<ItemGroup>
 		<PackageReference Include="CommunityToolkit.Maui" Version="12.2.0" />
 		<PackageReference Include="CommunityToolkit.Mvvm" Version="8.3.2" />
-		<PackageReference Include="Microsoft.Maui.Controls" Version="9.0.90" />
+		<PackageReference Include="Microsoft.Maui.Controls" Version="9.0.111" />
 		<PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="9.0.5" />
 		<PackageReference Include="Plugin.Maui.Audio" Version="3.0.0" />
 		<PackageReference Include="sqlite-net-pcl" Version="1.9.172" />
-		<!-- Removed Microsoft.ML.OnnxRuntime dependency after removing DistilBERT assets -->
+		<PackageReference Include="Syncfusion.Pdf.Net.Core" Version="26.2.9" />
+		<PackageReference Include="DocumentFormat.OpenXml" Version="3.0.2" />
+		<PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+	</ItemGroup>
+
+	<!-- Use Update so we do NOT duplicate XAML resources (fixes CS1508). -->
+	<ItemGroup>
+	  <MauiXaml Update="Pages\AddFlashcardsPage.xaml" />
+	  <MauiXaml Update="Pages\GameOverPage.xaml" />
+	  <MauiXaml Update="Pages\ProfileSettingsPage.xaml" />
+	  <MauiXaml Update="Pages\ReviewMistakesPage.xaml" />
+	  <MauiXaml Update="Pages\SessionSummaryPage.xaml" />
+	  <MauiXaml Update="Pages\SummarizeContentPage.xaml" />
+	  <MauiXaml Update="Pages\ReviewersPage.xaml" />
+	  <MauiXaml Update="Pages\CourseReviewPage.xaml" />
+	  <MauiXaml Update="Pages\MultiplayerPage.xaml" />
+	  <MauiXaml Update="Pages\OnboardingPage.xaml" />
+	  <MauiXaml Update="Pages\ReviewerEditorPage.xaml" />
+	  <MauiXaml Update="Pages\TaglinePage.xaml" />
+	  <MauiXaml Update="Pages\ExportPage.xaml" />
+	  <MauiXaml Update="Pages\ImportPage.xaml" />
+	  <MauiXaml Update="Pages\HomePage.xaml" />
+	  <MauiXaml Update="Pages\TitleReviewerPage.xaml" />
+	  <MauiXaml Update="Pages\ReviewerSettingsPage.xaml" />
 	</ItemGroup>
 
 	<ItemGroup>
-	  <MauiXaml Update="Pages\AddFlashcardsPage.xaml">
-	    <Generator>MSBuild:Compile</Generator>
-	  </MauiXaml>
-	  <MauiXaml Update="Pages\GameOverPage.xaml">
-	    <Generator>MSBuild:Compile</Generator>
-	  </MauiXaml>
-	  <MauiXaml Update="Pages\ProfileSettingsPage.xaml">
-	    <Generator>MSBuild:Compile</Generator>
-	  </MauiXaml>
-	  <MauiXaml Update="Pages\SummarizeContentPage.xaml">
-	    <Generator>MSBuild:Compile</Generator>
-	  </MauiXaml>
+		<Content Include="Models\mindvault_qwen2_0.5b_q4_k_m.gguf" Condition="$(TargetFramework.Contains('windows'))">
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+		</Content>
+		<Content Include="Scripts\flashcard_ai.py">
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+		</Content>
 	</ItemGroup>
 
 </Project>

@@ -49,7 +49,7 @@ public static class MenuWiring
                 await Navigator.PushAsync(new MultiplayerPage(), nav);
         };
 
-        // Import -> perform same flow as ReviewersPage import button
+        // Import -> only .txt files
         menu.ImportTapped += async (_, __) =>
         {
             try
@@ -64,10 +64,17 @@ public static class MenuWiring
 
                 var pick = await FilePicker.PickAsync(new PickOptions
                 {
-                    PickerTitle = "Select export file",
+                    PickerTitle = "Select .txt export file",
                     FileTypes = fileTypes
                 });
                 if (pick is null) return;
+
+                // Extension enforcement (.txt only)
+                if (!string.Equals(Path.GetExtension(pick.FileName), ".txt", System.StringComparison.OrdinalIgnoreCase))
+                {
+                    await Application.Current?.MainPage?.DisplayAlert("Import", "Only .txt files are supported.", "OK")!;
+                    return;
+                }
 
                 string content;
                 using (var stream = await pick.OpenReadAsync())
@@ -102,18 +109,18 @@ public static class MenuWiring
     static (string Title, List<(string Q, string A)> Cards) ParseExport(string content)
     {
         var lines = content.Replace("\r", string.Empty).Split('\n');
-        string title = lines.FirstOrDefault(l => l.StartsWith("Reviewer:", StringComparison.OrdinalIgnoreCase))?.Substring(9).Trim() ?? "Imported Reviewer";
+        string title = lines.FirstOrDefault(l => l.StartsWith("Reviewer:", System.StringComparison.OrdinalIgnoreCase))?.Substring(9).Trim() ?? "Imported Reviewer";
         var cards = new List<(string Q, string A)>();
         string? q = null;
         foreach (var raw in lines)
         {
             var line = raw.Trim();
-            if (line.StartsWith("Q:", StringComparison.OrdinalIgnoreCase))
+            if (line.StartsWith("Q:", System.StringComparison.OrdinalIgnoreCase))
             {
                 if (!string.IsNullOrWhiteSpace(q)) { cards.Add((q, string.Empty)); }
                 q = line.Substring(2).Trim();
             }
-            else if (line.StartsWith("A:", StringComparison.OrdinalIgnoreCase))
+            else if (line.StartsWith("A:", System.StringComparison.OrdinalIgnoreCase))
             {
                 var a = line.Substring(2).Trim();
                 if (!string.IsNullOrWhiteSpace(q) || !string.IsNullOrWhiteSpace(a))

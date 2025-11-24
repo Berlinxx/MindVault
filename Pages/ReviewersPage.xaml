@@ -70,7 +70,7 @@
     </LinearGradientBrush>
   </ContentPage.Background>
 
-  <Grid x:Name="MainGrid" RowDefinitions="Auto,*">
+  <Grid x:Name="RootGrid" RowDefinitions="Auto,*">
 
     <!-- ===== HEADER ===== -->
     <Border Grid.Row="0" BackgroundColor="White" StrokeThickness="0"
@@ -138,8 +138,8 @@
           </VerticalStackLayout>
         </Border>
 
-        <!-- REVIEWER CARD LIST -->
-        <CollectionView ItemsSource="{Binding Reviewers}" SelectionMode="None">
+        <!-- REVIEWER CARD LIST (shows when loaded) -->
+        <CollectionView ItemsSource="{Binding Reviewers}" SelectionMode="None" IsVisible="{Binding IsLoaded}" ItemSizingStrategy="MeasureFirstItem">
           <CollectionView.ItemTemplate>
             <DataTemplate>
               <Border Style="{StaticResource CardStyle}">
@@ -202,7 +202,7 @@
 
                       <ProgressBar Grid.ColumnSpan="2" Grid.Row="1"
                                    Progress="{Binding ProgressRatio}" HeightRequest="10"
-                                   BackgroundColor="#E6EEF3" Margin="0,4,0,0"/>
+                                   BackgroundColor="#E6EEF3" ProgressColor="{StaticResource PrimaryDark}" Margin="0,4,0,0"/>
                     </Grid>
 
                     <!-- VIEW COURSE -->
@@ -220,6 +220,38 @@
             </DataTemplate>
           </CollectionView.ItemTemplate>
         </CollectionView>
+
+        <!-- Skeleton placeholders while loading -->
+        <VerticalStackLayout x:Name="SkeletonList" IsVisible="{Binding IsLoadingReviewers}" Spacing="12">
+          <Border Style="{StaticResource CardStyle}">
+            <VerticalStackLayout Spacing="10">
+              <BoxView HeightRequest="20" Color="#E6EEF3" CornerRadius="6" />
+              <BoxView HeightRequest="12" Color="#F0F4F8" CornerRadius="6" WidthRequest="120" />
+              <BoxView HeightRequest="10" Color="#E6EEF3" CornerRadius="6" Margin="0,4,0,0" />
+            </VerticalStackLayout>
+          </Border>
+          <Border Style="{StaticResource CardStyle}">
+            <VerticalStackLayout Spacing="10">
+              <BoxView HeightRequest="20" Color="#E6EEF3" CornerRadius="6" />
+              <BoxView HeightRequest="12" Color="#F0F4F8" CornerRadius="6" WidthRequest="140" />
+              <BoxView HeightRequest="10" Color="#E6EEF3" CornerRadius="6" Margin="0,4,0,0" />
+            </VerticalStackLayout>
+          </Border>
+          <Border Style="{StaticResource CardStyle}">
+            <VerticalStackLayout Spacing="10">
+              <BoxView HeightRequest="20" Color="#E6EEF3" CornerRadius="6" />
+              <BoxView HeightRequest="12" Color="#F0F4F8" CornerRadius="6" WidthRequest="100" />
+              <BoxView HeightRequest="10" Color="#E6EEF3" CornerRadius="6" Margin="0,4,0,0" />
+            </VerticalStackLayout>
+          </Border>
+          <Border Style="{StaticResource CardStyle}">
+            <VerticalStackLayout Spacing="10">
+              <BoxView HeightRequest="20" Color="#E6EEF3" CornerRadius="6" />
+              <BoxView HeightRequest="12" Color="#F0F4F8" CornerRadius="6" WidthRequest="160" />
+              <BoxView HeightRequest="10" Color="#E6EEF3" CornerRadius="6" Margin="0,4,0,0" />
+            </VerticalStackLayout>
+          </Border>
+        </VerticalStackLayout>
 
         <!-- CREATE REVIEWER -->
         <Border x:Name="CreatePill"

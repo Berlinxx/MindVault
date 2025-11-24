@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage
+    x:Class="mindvault.Pages.SessionSummaryPage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    Shell.NavBarIsVisible="False">
+
+    <VisualStateManager.VisualStateGroups>
+        <VisualStateGroup x:Name="WindowStates">
+            <VisualState x:Name="Narrow">
+                <VisualState.StateTriggers>
+                    <AdaptiveTrigger MinWindowWidth="0" />
+                </VisualState.StateTriggers>
+                <VisualState.Setters>
+                    <Setter TargetName="SummaryGrid" Property="Grid.ColumnDefinitions" Value="*" />
+                    <Setter TargetName="SummaryGrid" Property="Grid.RowDefinitions" Value="Auto,*" />
+                    <Setter TargetName="SummarySection" Property="Grid.Row" Value="0" />
+                    <Setter TargetName="SummarySection" Property="Grid.Column" Value="0" />
+                    <Setter TargetName="MistakesSection" Property="Grid.Row" Value="1" />
+                    <Setter TargetName="MistakesSection" Property="Grid.Column" Value="0" />
+                    <Setter TargetName="ReviewMistakesButton" Property="IsVisible" Value="False" />
+                </VisualState.Setters>
+            </VisualState>
+            <VisualState x:Name="Wide">
+                <VisualState.StateTriggers>
+                    <AdaptiveTrigger MinWindowWidth="800" />
+                </VisualState.StateTriggers>
+                <VisualState.Setters>
+                    <Setter TargetName="SummaryGrid" Property="Grid.ColumnDefinitions" Value="*,*" />
+                    <Setter TargetName="SummaryGrid" Property="Grid.RowDefinitions" Value="*" />
+                    <Setter TargetName="SummarySection" Property="Grid.Row" Value="0" />
+                    <Setter TargetName="SummarySection" Property="Grid.Column" Value="0" />
+                    <Setter TargetName="MistakesSection" Property="Grid.Row" Value="0" />
+                    <Setter TargetName="MistakesSection" Property="Grid.Column" Value="1" />
+                    <Setter TargetName="ReviewMistakesButton" Property="IsVisible" Value="False" />
+                </VisualState.Setters>
+            </VisualState>
+        </VisualStateGroup>
+    </VisualStateManager.VisualStateGroups>
+
+    <ContentPage.Background>
+        <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+            <GradientStop Color="#3CC5F0" Offset="0" />
+            <GradientStop Color="#0B57C1" Offset="1" />
+        </LinearGradientBrush>
+    </ContentPage.Background>
+
+    <Grid x:Name="SummaryGrid">
+        <!-- Summary Section -->
+        <ScrollView x:Name="SummarySection">
+            <Grid HorizontalOptions="Center">
+                <VerticalStackLayout Spacing="20"
+                                     Padding="28,48,28,32"
+                                     WidthRequest="{OnPlatform Android=340, Default=-1}"
+                                     MaximumWidthRequest="420">
+                    <Image Source="logo.png" HeightRequest="72" WidthRequest="72" HorizontalOptions="Center" />
+                    <Label Text="Session Complete!" FontAttributes="Bold" FontSize="22" TextColor="White" HorizontalTextAlignment="Center" />
+
+                    <Grid ColumnDefinitions="*,*" ColumnSpacing="22" Padding="0,8">
+                        <Border BackgroundColor="#E4EBF3" StrokeShape="RoundRectangle 16" Padding="16" Grid.Column="0">
+                            <VerticalStackLayout Spacing="4" HorizontalOptions="Center">
+                                <Label Text="Correct:" FontSize="12" TextColor="#0D3848" />
+                                <Label Text="{Binding Correct}" FontSize="30" FontAttributes="Bold" TextColor="#0D3848" />
+                            </VerticalStackLayout>
+                        </Border>
+                        <Border BackgroundColor="#E4EBF3" StrokeShape="RoundRectangle 16" Padding="16" Grid.Column="1">
+                            <VerticalStackLayout Spacing="4" HorizontalOptions="Center">
+                                <Label Text="Wrong:" FontSize="12" TextColor="#0D3848" />
+                                <Label Text="{Binding Wrong}" FontSize="30" FontAttributes="Bold" TextColor="#0D3848" />
+                            </VerticalStackLayout>
+                        </Border>
+                    </Grid>
+
+                    <Label Text="{Binding DurationText}" FontSize="12" TextColor="#F0F6FA" HorizontalTextAlignment="Center" />
+                    <Label Text="{Binding MemorizedEstimateText}" FontSize="12" TextColor="#F0F6FA" HorizontalTextAlignment="Center" />
+
+                    <VerticalStackLayout Spacing="14" WidthRequest="260" HorizontalOptions="Center">
+                        <Button x:Name="ReviewMistakesButton" Text="Review Mistakes" Clicked="OnReviewMistakes" BackgroundColor="#5C6BF5" TextColor="White" />
+                        <Button Text="Study More" Clicked="OnStudyMore" BackgroundColor="#FFFFFF" TextColor="#0D3848" />
+                        <Button Text="Back to Reviewers" Clicked="OnBack" BackgroundColor="#FFFFFF" TextColor="#0D3848" />
+                    </VerticalStackLayout>
+                </VerticalStackLayout>
+            </Grid>
+        </ScrollView>
+
+        <!-- Mistakes Section -->
+        <ScrollView x:Name="MistakesSection" IsVisible="{Binding HasMistakes}">
+            <VerticalStackLayout Spacing="18" Padding="24,56,24,32">
+                <Label Text="Review Mistakes" FontSize="20" FontAttributes="Bold" TextColor="White" HorizontalTextAlignment="Center" />
+                <CollectionView ItemsSource="{Binding Mistakes}" SelectionMode="None">
+                    <CollectionView.ItemTemplate>
+                        <DataTemplate>
+                            <Border BackgroundColor="#E4EBF3" StrokeShape="RoundRectangle 14" Padding="14" Margin="0,0,0,4">
+                                <VerticalStackLayout Spacing="6">
+                                    <Label Text="{Binding Q}" FontAttributes="Bold" TextColor="#0D3848" />
+                                    <Label Text="{Binding A}" TextColor="#0D3848" />
+                                </VerticalStackLayout>
+                            </Border>
+                        </DataTemplate>
+                    </CollectionView.ItemTemplate>
+                </CollectionView>
+            </VerticalStackLayout>
+        </ScrollView>
+    </Grid>
+</ContentPage>

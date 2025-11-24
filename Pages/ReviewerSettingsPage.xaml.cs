@@ -181,12 +181,20 @@ public partial class ReviewerSettingsPage : ContentPage, INotifyPropertyChanged
     {
         try
         {
+            WeakReferenceMessenger.Default.Send(new SettingsClosedMessage(ReviewerId));
             await Navigator.PopAsync(Navigation);
         }
         catch
         {
+            WeakReferenceMessenger.Default.Send(new SettingsClosedMessage(ReviewerId));
             await Navigator.GoToAsync("///ReviewersPage");
         }
+    }
+
+    protected override async void OnAppearing()
+    {
+        base.OnAppearing();
+        await mindvault.Utils.AnimHelpers.SlideFadeInAsync(Content);
     }
 
     public new event PropertyChangedEventHandler? PropertyChanged;

@@ -99,7 +99,7 @@
     </LinearGradientBrush>
   </ContentPage.Background>
 
-  <Grid RowDefinitions="Auto,*">
+  <Grid x:Name="RootGrid" RowDefinitions="Auto,*">
     <!-- ===== HEADER ===== -->
     <Border Grid.Row="0"
             BackgroundColor="White"

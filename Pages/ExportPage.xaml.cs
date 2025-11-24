@@ -38,6 +38,12 @@ public partial class ExportPage : ContentPage
         PageHelpers.SetupHamburgerMenu(this);
     }
 
+    protected override async void OnAppearing()
+    {
+        base.OnAppearing();
+        await mindvault.Utils.AnimHelpers.SlideFadeInAsync(Content);
+    }
+
     private async void OnExportTapped(object? sender, EventArgs e)
     {
         try

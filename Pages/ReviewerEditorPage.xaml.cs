@@ -44,9 +44,10 @@ public partial class ReviewerEditorPage : ContentPage, INotifyPropertyChanged
         PageHelpers.SetupHamburgerMenu(this);
     }
 
-    protected override void OnAppearing()
+    protected override async void OnAppearing()
     {
         base.OnAppearing();
+        await mindvault.Utils.AnimHelpers.SlideFadeInAsync(Content);
         if (Shell.Current is not null)
             Shell.Current.Navigating += OnShellNavigating; // global guard
     }

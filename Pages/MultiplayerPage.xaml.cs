@@ -127,4 +127,10 @@ public partial class MultiplayerPage : ContentPage
     {
         _ = JoinAsync();
     }
+
+    protected override async void OnAppearing()
+    {
+        base.OnAppearing();
+        await mindvault.Utils.AnimHelpers.SlideFadeInAsync(Content);
+    }
 }

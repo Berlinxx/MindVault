@@ -101,7 +101,7 @@
 
         <!-- Progress bar -->
         <Border BackgroundColor="{StaticResource BarBg}" HeightRequest="14"
-                StrokeThickness="0" StrokeShape="RoundRectangle 8">
+                StrokeShape="RoundRectangle 8" StrokeThickness="0">
           <Border BackgroundColor="{StaticResource PrimaryDark}" StrokeThickness="0"
                   StrokeShape="RoundRectangle 8"
                   HorizontalOptions="Start" WidthRequest="{Binding ProgressWidth}" />
@@ -211,7 +211,20 @@
         <!-- Bottom controls -->
         <Grid ColumnDefinitions="*,Auto,*" Padding="6,4,6,0">
           <!-- Fail -->
-          <Border Grid.Column="0" BackgroundColor="#C5D6E4" Style="{StaticResource Pill}">
+          <Border
+            x:Name="FailButton"
+            Grid.Column="0"
+            BackgroundColor="#C5D6E4"
+            IsEnabled="{Binding AnswerButtonsEnabled}"
+            Style="{StaticResource Pill}">
+            <Border.Triggers>
+              <DataTrigger
+                Binding="{Binding IsEnabled, Source={x:Reference FailButton}}"
+                TargetType="Border"
+                Value="False">
+                <Setter Property="Opacity" Value="0.5" />
+              </DataTrigger>
+            </Border.Triggers>
             <Grid ColumnDefinitions="Auto,*">
               <Label Text="&#xF00D;" FontFamily="FAS" TextColor="{StaticResource Ink}" />
               <Label Grid.Column="1" Text="" />
@@ -230,7 +243,20 @@
           </Border>
 
           <!-- Pass -->
-          <Border Grid.Column="2" BackgroundColor="#8AB8D3" Style="{StaticResource Pill}">
+          <Border
+            x:Name="PassButton"
+            Grid.Column="2"
+            BackgroundColor="#8AB8D3"
+            IsEnabled="{Binding AnswerButtonsEnabled}"
+            Style="{StaticResource Pill}">
+            <Border.Triggers>
+              <DataTrigger
+                Binding="{Binding IsEnabled, Source={x:Reference PassButton}}"
+                TargetType="Border"
+                Value="False">
+                <Setter Property="Opacity" Value="0.5" />
+              </DataTrigger>
+            </Border.Triggers>
             <Grid ColumnDefinitions="*,Auto">
               <Label Text="" />
               <Label Grid.Column="1" Text="&#xF00C;" FontFamily="FAS" TextColor="White" />

@@ -56,4 +56,5 @@
   <!-- Reviewer Settings -->
   <ShellContent Route="ReviewerSettingsPage"
                 ContentTemplate="{DataTemplate pages:ReviewerSettingsPage}" />
+  <!-- Session Summary route only (no direct tab) -->
 </Shell>

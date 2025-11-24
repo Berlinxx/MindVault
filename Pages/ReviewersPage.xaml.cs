@@ -1,22 +1,19 @@
 ﻿using System.Collections.ObjectModel;
-using mindvault.Controls;
-using mindvault.Services;
-using mindvault.Pages;
-using mindvault.Utils;
-using System.Diagnostics;
-using mindvault.Data;
-using Microsoft.Maui.Storage;
-using System.Linq;
-using System.IO;
 using System.Collections.Generic;
+using System.Linq;
+using System.Diagnostics;
+using System.IO;
+using System.Threading.Tasks;
+using Microsoft.Maui.Storage;
 using Microsoft.Maui.Devices;
-using System.Text.Json;
+using Microsoft.Maui.Controls; // ensure ContentPage & InitializeComponent
+using mindvault.Services;
+using mindvault.Utils;
 
 namespace mindvault.Pages;
 
 public partial class ReviewersPage : ContentPage
 {
-    // Formal, consistent dropdown options
     public ObservableCollection<string> SortOptions { get; } = new()
     {
         "All (Default)",
@@ -40,7 +37,6 @@ public partial class ReviewersPage : ContentPage
         }
     }
 
-    // Search state
     bool _isSearchVisible;
     public bool IsSearchVisible
     {
@@ -48,22 +44,38 @@ public partial class ReviewersPage : ContentPage
         set { if (_isSearchVisible == value) return; _isSearchVisible = value; OnPropertyChanged(); }
     }
 
+    System.Threading.CancellationTokenSource? _searchDebounce;
     string _searchText = string.Empty;
     public string SearchText
     {
         get => _searchText;
-        set { if (_searchText == value) return; _searchText = value ?? string.Empty; OnPropertyChanged(); ApplySort(); }
+        set
+        {
+            if (_searchText == value) return;
+            _searchText = value ?? string.Empty;
+            OnPropertyChanged();
+            _searchDebounce?.Cancel();
+            var cts = new System.Threading.CancellationTokenSource();
+            _searchDebounce = cts;
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await Task.Delay(250, cts.Token);
+                    if (cts.IsCancellationRequested) return;
+                    MainThread.BeginInvokeOnMainThread(ApplySort);
+                }
+                catch (TaskCanceledException) { }
+            });
+        }
     }
 
-    public ObservableCollection<ReviewerCard> Reviewers { get; } = new();
+    public ObservableRangeCollection<ReviewerCard> Reviewers { get; } = new();
+    public bool IsLoadingReviewers { get; set; }
+    public bool IsLoaded { get; set; }
 
-    // Keep the baseline order loaded from DB (default order)
     private List<ReviewerCard> _baseline = new();
-
     readonly DatabaseService _db;
-
-    const string PrefReviewStatePrefix = "ReviewState_"; // from CourseReviewPage
-    const int MemorizedThreshold = 21;
 
     public ReviewersPage()
     {
@@ -73,135 +85,99 @@ public partial class ReviewersPage : ContentPage
         _db = ServiceHelper.GetRequiredService<DatabaseService>();
     }
 
-    protected override async void OnAppearing()
+    protected override void OnAppearing()
     {
         base.OnAppearing();
-        await LoadFromDbAsync();
+        _ = StartEntryAnimationAsync();
+        var cache = ServiceHelper.GetRequiredService<ReviewersCacheService>();
+        _ = Task.Run(async () =>
+        {
+            await cache.RefreshAsync();
+            var list = cache.Items.Select(item => new ReviewerCard
+            {
+                Id = item.Id,
+                Title = item.Title,
+                Questions = item.Questions,
+                ProgressRatio = item.ProgressRatio,
+                ProgressLabel = item.ProgressLabel,
+                Due = item.Due,
+                CreatedUtc = item.CreatedUtc,
+                LastPlayedUtc = item.LastPlayedUtc
+            }).ToList();
+            _baseline = list;
+            MainThread.BeginInvokeOnMainThread(ApplyLoadedData);
+        });
         WireOnce();
+    }
+
+    async Task StartEntryAnimationAsync()
+    {
+        try
+        {
+            var target = this.FindByName<Grid>("RootGrid") ?? (VisualElement)Content;
+            await AnimHelpers.SlideFadeInAsync(target);
+        }
+        catch { }
     }
 
     async Task LoadFromDbAsync()
     {
-        Reviewers.Clear();
-        _baseline.Clear();
         var rows = await _db.GetReviewersAsync();
+        var statsList = await _db.GetReviewerStatsAsync();
+        var statsMap = statsList.ToDictionary(s => s.ReviewerId);
+        var newBaseline = new List<ReviewerCard>();
         foreach (var r in rows)
         {
-            var cards = await _db.GetFlashcardsAsync(r.Id);
+            statsMap.TryGetValue(r.Id, out var stats);
+            int total = stats?.Total ?? 0;
+            int learnedRaw = stats?.Learned ?? 0;
             var lastPlayed = Preferences.Get(GetLastPlayedKey(r.Id), DateTime.MinValue);
-
-            // Default fallbacks
-            double progressRatio = (cards.Count == 0) ? 0 : (double)cards.Count(c => c.Learned) / cards.Count;
-            string progressLabel = "Learned";
-            int dueNow = 0;
-
-            // Try restore saved review progress
-            try
-            {
-                var payload = Preferences.Get(PrefReviewStatePrefix + r.Id, null);
-                if (!string.IsNullOrWhiteSpace(payload))
-                {
-                    var dtos = JsonSerializer.Deserialize<List<CardStateDto>>(payload);
-                    if (dtos is not null && cards.Count > 0)
-                    {
-                        int total = cards.Count;
-                        int memorized = 0, skilled = 0, learned = 0, due = 0;
-                        var now = DateTime.UtcNow;
-                        foreach (var d in dtos)
-                        {
-                            var dueAt = new DateTime(d.DueAtTicks, DateTimeKind.Utc);
-                            if (!string.Equals(d.Stage, "Avail", StringComparison.OrdinalIgnoreCase) && dueAt <= now)
-                                due++;
-
-                            if (d.CountedMemorized || d.ReviewSuccessStreak >= MemorizedThreshold)
-                                memorized++;
-                            else if (d.CountedSkilled || d.ReviewSuccessStreak >= 1)
-                                skilled++;
-                            else if (d.InReview || string.Equals(d.Stage, "Learned", StringComparison.OrdinalIgnoreCase) ||
-                                     string.Equals(d.Stage, "Skilled", StringComparison.OrdinalIgnoreCase) ||
-                                     string.Equals(d.Stage, "Memorized", StringComparison.OrdinalIgnoreCase))
-                                learned++;
-                        }
-
-                        // Highest attained section selection
-                        if (memorized > 0)
-                        {
-                            progressRatio = (double)memorized / total;
-                            progressLabel = "Memorized";
-                        }
-                        else if (skilled > 0)
-                        {
-                            progressRatio = (double)skilled / total;
-                            progressLabel = "Skilled";
-                        }
-                        else
-                        {
-                            progressRatio = (double)learned / total;
-                            progressLabel = "Learned";
-                        }
-                        dueNow = due;
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"[ReviewersPage] Parse progress failed for reviewer {r.Id}: {ex.Message}");
-            }
-
-            var card = new ReviewerCard
+            double progressRatio = (total == 0) ? 0 : (double)learnedRaw / total;
+            newBaseline.Add(new ReviewerCard
             {
                 Id = r.Id,
                 Title = r.Title,
-                Questions = cards.Count,
+                Questions = total,
                 ProgressRatio = progressRatio,
-                ProgressLabel = progressLabel,
-                Due = dueNow,
+                ProgressLabel = "Learned",
+                Due = 0,
                 CreatedUtc = r.CreatedUtc,
                 LastPlayedUtc = lastPlayed == DateTime.MinValue ? null : lastPlayed
-            };
-            _baseline.Add(card);
+            });
         }
-        // Fill UI list with baseline, then apply current sort
-        foreach (var c in _baseline)
-            Reviewers.Add(c);
+        _baseline = newBaseline;
+    }
+
+    void ApplyLoadedData()
+    {
+        Reviewers.ReplaceRange(_baseline);
         ApplySort();
+        IsLoaded = true;
+        IsLoadingReviewers = false;
+        OnPropertyChanged(nameof(IsLoaded));
+        OnPropertyChanged(nameof(IsLoadingReviewers));
     }
 
     static string GetLastPlayedKey(int reviewerId) => $"reviewer_last_played_{reviewerId}";
 
-    // ===== Robust navigation wiring =====
     bool _wired;
     void WireOnce()
     {
         if (_wired) return;
-        // Removed ImportPill extra wiring to avoid duplicating XAML tap handler
         _wired = true;
-    }
-
-    protected override void OnDisappearing()
-    {
-        base.OnDisappearing();
-        // If you add event handlers via +=, unsubscribe here to prevent leaks.
     }
 
     void ApplySort()
     {
         IEnumerable<ReviewerCard> source = _baseline;
-
-        // Apply search filter first
         var keyword = SearchText?.Trim();
         if (!string.IsNullOrEmpty(keyword))
-        {
             source = source.Where(c => c.Title?.Contains(keyword, StringComparison.OrdinalIgnoreCase) == true);
-        }
 
-        // Then apply sorting
         switch (SelectedSort)
         {
             case "Last Played (Recent first)":
-                source = source
-                    .OrderByDescending(c => c.LastPlayedUtc.HasValue)
-                    .ThenByDescending(c => c.LastPlayedUtc);
+                source = source.OrderByDescending(c => c.LastPlayedUtc.HasValue).ThenByDescending(c => c.LastPlayedUtc);
                 break;
             case "Alphabetical (A–Z)":
                 source = source.OrderBy(c => c.Title, StringComparer.OrdinalIgnoreCase);
@@ -217,22 +193,17 @@ public partial class ReviewersPage : ContentPage
                 break;
             case "All (Default)":
             default:
-                // keep current source order
                 break;
         }
-
-        var result = source.ToList();
-        Reviewers.Clear();
-        foreach (var c in result)
-            Reviewers.Add(c);
+        Reviewers.ReplaceRange(source.ToList());
     }
 
     private async void OnDeleteTapped(object? sender, EventArgs e)
     {
         if (sender is Border border && border.BindingContext is ReviewerCard reviewer)
         {
-            bool confirmed = await PageHelpers.SafeDisplayAlertAsync(this, "Delete Reviewer", 
-                $"Are you sure you want to delete '{reviewer.Title}'?", 
+            bool confirmed = await PageHelpers.SafeDisplayAlertAsync(this, "Delete Reviewer",
+                $"Are you sure you want to delete '{reviewer.Title}'?",
                 "Delete", "Cancel");
             if (confirmed)
             {
@@ -267,24 +238,29 @@ public partial class ReviewersPage : ContentPage
         IsSearchVisible = !IsSearchVisible;
         if (IsSearchVisible)
         {
-            // Try to focus the SearchBar if available
             _ = MainThread.InvokeOnMainThreadAsync(async () =>
             {
                 await Task.Delay(50);
-                DeckSearchBar?.Focus();
+                var search = this.FindByName<SearchBar>("DeckSearchBar");
+                search?.Focus();
             });
         }
         else
         {
-            SearchText = string.Empty; // clearing will refresh the list
+            SearchText = string.Empty;
         }
     }
 
-    // Create reviewer button handler
     private async void OnCreateReviewerTapped(object? sender, EventArgs e)
     {
-        Debug.WriteLine($"[ReviewersPage] OpenTitle() -> TitleReviewerPage");
-        await NavigationService.OpenTitle();
+        try
+        {
+            await Shell.Current.GoToAsync("///TitleReviewerPage");
+        }
+        catch
+        {
+            await NavigationService.OpenTitle();
+        }
     }
 
     private async void OnExportTapped(object? sender, EventArgs e)
@@ -293,10 +269,8 @@ public partial class ReviewersPage : ContentPage
         {
             try
             {
-                // Fetch flashcards for this reviewer
                 var cards = await _db.GetFlashcardsAsync(reviewer.Id);
                 var list = cards.Select(c => (c.Question, c.Answer)).ToList();
-                // Navigate to ExportPage for preview
                 await Navigator.PushAsync(new ExportPage(reviewer.Title, list), Navigation);
             }
             catch (Exception ex)
@@ -320,10 +294,15 @@ public partial class ReviewersPage : ContentPage
 
             var pick = await FilePicker.PickAsync(new PickOptions
             {
-                PickerTitle = "Select export file",
+                PickerTitle = "Select .txt export file",
                 FileTypes = fileTypes
             });
             if (pick is null) return;
+            if (!string.Equals(Path.GetExtension(pick.FileName), ".txt", System.StringComparison.OrdinalIgnoreCase))
+            {
+                await PageHelpers.SafeDisplayAlertAsync(this, "Import", "Only .txt files are supported.", "OK");
+                return;
+            }
 
             string content;
             using (var stream = await pick.OpenReadAsync())
@@ -337,7 +316,6 @@ public partial class ReviewersPage : ContentPage
                 return;
             }
 
-            // Navigate to ImportPage to preview and confirm import
             await Navigator.PushAsync(new ImportPage(title, cards), Navigation);
         }
         catch (Exception ex)
@@ -373,50 +351,4 @@ public partial class ReviewersPage : ContentPage
         if (!string.IsNullOrWhiteSpace(q)) cards.Add((q, string.Empty));
         return (title, cards);
     }
-
-    private async Task<string> EnsureUniqueTitleAsync(string title)
-    {
-        var existing = await _db.GetReviewersAsync();
-        if (!existing.Any(r => string.Equals(r.Title, title, StringComparison.OrdinalIgnoreCase)))
-            return title;
-        int i = 2;
-        while (true)
-        {
-            var candidate = $"{title} ({i})";
-            if (!existing.Any(r => string.Equals(r.Title, candidate, StringComparison.OrdinalIgnoreCase)))
-                return candidate;
-            i++;
-        }
-    }
-
-    // Minimal DTO to read saved progress
-    record CardStateDto(
-        int Id,
-        string Stage,
-        long DueAtTicks,
-        bool InReview,
-        int ReviewSuccessStreak,
-        bool CountedSkilled,
-        bool CountedMemorized
-    );
-}
-
-public class ReviewerCard
-{
-    public int Id { get; set; }
-    public string Title { get; set; } = string.Empty;
-    public int Questions { get; set; }
-
-    // Progress bar shows highest attained section ratio
-    public double ProgressRatio { get; set; }
-    public string ProgressLabel { get; set; } = "Learned";
-
-    public int Due { get; set; }
-
-    public DateTime CreatedUtc { get; set; }
-    public DateTime? LastPlayedUtc { get; set; }
-
-    // Convenience texts for binding
-    public string ProgressPercentText => $"{(int)(ProgressRatio * 100)}% {ProgressLabel}";
-    public string DueText => $"{Due} due";
 }

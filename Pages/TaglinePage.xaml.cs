@@ -11,9 +11,10 @@ public partial class TaglinePage : ContentPage
         InitializeComponent();
     }
 
-    protected override void OnAppearing()
+    protected override async void OnAppearing()
     {
         base.OnAppearing();
+        await mindvault.Utils.AnimHelpers.SlideFadeInAsync(Content);
 
         // prevent double navigation if page re-appears
         if (_navigated) return;

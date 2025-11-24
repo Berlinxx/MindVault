@@ -1,5 +1,7 @@
 using SQLite;
 using mindvault.Data;
+using System.Collections.Generic;
+using System.Threading.Tasks;
 
 namespace mindvault.Services;
 
@@ -27,6 +29,10 @@ public class DatabaseService
     public Task<List<Reviewer>> GetReviewersAsync() => _db.Table<Reviewer>().OrderByDescending(r => r.Id).ToListAsync();
     public Task<List<Flashcard>> GetFlashcardsAsync(int reviewerId) => _db.Table<Flashcard>().Where(c => c.ReviewerId == reviewerId).OrderBy(c => c.Order).ToListAsync();
 
+    // Aggregated counts to speed up reviewer list loading
+    public Task<List<ReviewerStats>> GetReviewerStatsAsync() => _db.QueryAsync<ReviewerStats>(
+        "SELECT ReviewerId as ReviewerId, COUNT(*) as Total, SUM(CASE WHEN Learned = 1 THEN 1 ELSE 0 END) as Learned FROM Flashcard GROUP BY ReviewerId");
+
     public Task<int> DeleteReviewerAsync(Reviewer reviewer) => _db.DeleteAsync(reviewer);
     public async Task<int> DeleteReviewerCascadeAsync(int reviewerId)
     {
@@ -44,4 +50,11 @@ public class DatabaseService
 
     public Task<int> UpdateReviewerTitleAsync(int reviewerId, string newTitle)
         => _db.ExecuteAsync("UPDATE Reviewer SET Title = ? WHERE Id = ?", newTitle, reviewerId);
+}
+
+public class ReviewerStats
+{
+    public int ReviewerId { get; set; }
+    public int Total { get; set; }
+    public int Learned { get; set; }
 }

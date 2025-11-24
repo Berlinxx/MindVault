@@ -16,3 +16,8 @@ public sealed class ProgressResetMessage : ValueChangedMessage<int>
 {
     public ProgressResetMessage(int reviewerId) : base(reviewerId) { }
 }
+
+public sealed class SettingsClosedMessage : ValueChangedMessage<int>
+{
+    public SettingsClosedMessage(int reviewerId) : base(reviewerId) { }
+}

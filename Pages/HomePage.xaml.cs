@@ -34,4 +34,10 @@ public partial class HomePage : ContentPage
                 await Navigation.PushAsync(new MultiplayerPage());
         }, "Could not navigate to Multiplayer Mode");
     }
+
+    protected override async void OnAppearing()
+    {
+        base.OnAppearing();
+        await mindvault.Utils.AnimHelpers.SlideFadeInAsync(Content);
+    }
 }

@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage x:Class="mindvault.Pages.ReviewMistakesPage"
+             xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             Shell.NavBarIsVisible="False">
+  <ContentPage.Background>
+    <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+      <GradientStop Color="#3CC5F0" Offset="0" />
+      <GradientStop Color="#0B57C1" Offset="1" />
+    </LinearGradientBrush>
+  </ContentPage.Background>
+  <ScrollView>
+    <VerticalStackLayout Spacing="18" Padding="24,56,24,32">
+      <Label Text="Review Mistakes" FontSize="20" FontAttributes="Bold" TextColor="White" HorizontalTextAlignment="Center" />
+      <CollectionView ItemsSource="{Binding Items}" SelectionMode="None">
+        <CollectionView.ItemTemplate>
+          <DataTemplate>
+            <Border BackgroundColor="#E4EBF3" StrokeShape="RoundRectangle 14" Padding="14" Margin="0,0,0,4">
+              <VerticalStackLayout Spacing="6">
+                <Label Text="{Binding Q}" FontAttributes="Bold" TextColor="#0D3848" />
+                <Label Text="{Binding A}" TextColor="#0D3848" />
+              </VerticalStackLayout>
+            </Border>
+          </DataTemplate>
+        </CollectionView.ItemTemplate>
+      </CollectionView>
+      <Button Text="Continue Reviewing" Clicked="OnContinue" BackgroundColor="#5C6BF5" TextColor="White" />
+    </VerticalStackLayout>
+  </ScrollView>
+</ContentPage>

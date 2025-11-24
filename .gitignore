@@ -66,3 +66,6 @@ secrets.json
 *.rej
 *.tmp
 ~$*
+
+# Ignore large model files
+Models/*.gguf

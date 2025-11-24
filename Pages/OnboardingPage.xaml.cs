@@ -75,6 +75,12 @@ public partial class OnboardingPage : ContentPage
         }
         finally { SkipBtn.IsEnabled = NextBtn.IsEnabled = LetsGoBtn.IsEnabled = true; }
     }
+
+    protected override async void OnAppearing()
+    {
+        base.OnAppearing();
+        await mindvault.Utils.AnimHelpers.SlideFadeInAsync(Content);
+    }
 }
 
 // IMPORTANT: change third field name to Icon (not Image)

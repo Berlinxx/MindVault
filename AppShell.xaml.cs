@@ -13,6 +13,9 @@ public partial class AppShell : Shell
         // MultiplayerPage is navigated via Shell route but not present in XAML
         Routing.RegisterRoute(nameof(Pages.MultiplayerPage), typeof(Pages.MultiplayerPage));
         Routing.RegisterRoute(nameof(Pages.ProfileSettingsPage), typeof(Pages.ProfileSettingsPage));
+        Routing.RegisterRoute(nameof(Pages.FlashcardResultPage), typeof(Pages.FlashcardResultPage));
+        Routing.RegisterRoute(nameof(Pages.SessionSummaryPage), typeof(Pages.SessionSummaryPage));
+        Routing.RegisterRoute(nameof(Pages.ReviewMistakesPage), typeof(Pages.ReviewMistakesPage));
     }
 
     protected override bool OnBackButtonPressed()

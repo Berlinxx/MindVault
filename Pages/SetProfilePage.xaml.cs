@@ -102,4 +102,10 @@ public partial class SetProfilePage : ContentPage
         // After successful save, go to Home
         await Navigator.GoToAsync("///HomePage");
     }
+
+    protected override async void OnAppearing()
+    {
+        base.OnAppearing();
+        await mindvault.Utils.AnimHelpers.SlideFadeInAsync(Content);
+    }
 }

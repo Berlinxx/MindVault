@@ -92,4 +92,10 @@ public partial class ImportPage : ContentPage
             i++;
         }
     }
+
+    protected override async void OnAppearing()
+    {
+        base.OnAppearing();
+        await mindvault.Utils.AnimHelpers.SlideFadeInAsync(Content);
+    }
 }
