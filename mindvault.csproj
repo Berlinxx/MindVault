@@ -22,13 +22,19 @@
 		<MauiEnableLinking>false</MauiEnableLinking>
 	</PropertyGroup>
 
+	<!-- Ensure assemblies are embedded into Android APKs so manual installs run standalone -->
+	<PropertyGroup Condition="'$(TargetFramework)'=='net9.0-android'">
+		<EmbedAssembliesIntoApk>true</EmbedAssembliesIntoApk>
+		<AndroidPackageFormat>apk</AndroidPackageFormat>
+	</PropertyGroup>
+
 	<ItemGroup>
 		<!-- Use PNG app icon and provide Android adaptive icon layers. -->
-		<!-- Foreground: the provided app_icon.png (should include transparency for best results) -->
-		<!-- Background: a solid color used behind the foreground on supported launchers -->
+		<!-- Foreground: an extracted transparent foreground PNG for the logo -->
+		<!-- Background: a solid color or background PNG used behind the foreground on supported launchers -->
 		<MauiIcon Include="Resources\AppIcon\app_icon.png"
-		          AndroidAdaptiveIconForeground="Resources\AppIcon\app_icon.png"
-		          AndroidAdaptiveIconBackground="#1A86D9" />
+		          AndroidAdaptiveIconForeground="Resources\AppIcon\app_icon_foreground.png"
+		          AndroidAdaptiveIconBackground="Resources\AppIcon\app_icon_background.png" />
 		<MauiSplashScreen Include="Resources\Splash\mindvault_logo.jpg" Color="#1A86D9" BaseSize="256,256" />
 		<MauiImage Include="Resources\Images\*" />
 		<MauiImage Update="Resources\Images\dotnet_bot.png" Resize="True" BaseSize="300,185" />
