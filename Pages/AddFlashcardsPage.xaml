@@ -159,11 +159,28 @@
                    SemanticProperties.Description="Format instructions for pasted text" />
             <Label Text="Note: Use any online LLM (e.g., ChatGPT or Gemini) to output lines directly like |(question:answer)|. Use '/n' inside question or answer to denote a newline." FontSize="11" TextColor="{StaticResource PrimaryDark}"
                    SemanticProperties.Description="Additional formatting notes and LLM usage tips" />
-            <Editor x:Name="PasteEditor" Placeholder="Paste here..." PlaceholderColor="#60717F" FontSize="13" HeightRequest="160" TextColor="{StaticResource TextPrimary}"
-                    IsEnabled="True"
-                    VerticalOptions="Start"
-                    SemanticProperties.Description="Paste flashcard text field"
-                    SemanticProperties.Hint="Paste formatted text with question and answer pairs in the format pipe question colon answer pipe" />
+            <Border HeightRequest="36" StrokeShape="RoundRectangle 8" Padding="12,8" BackgroundColor="#F1F5F8" Stroke="#E7E7E7" StrokeThickness="1" Margin="0,0,0,8"
+                    ToolTipProperties.Text="Click to insert example flashcards in the correct format"
+                    SemanticProperties.Description="Show example format button"
+                    SemanticProperties.Hint="Inserts sample flashcards to demonstrate the correct format">
+              <Label Text="📋 SHOW EXAMPLE FORMAT" FontSize="12" FontAttributes="Bold" TextColor="{StaticResource PrimaryDark}" HorizontalOptions="Center" VerticalOptions="Center" />
+              <Border.GestureRecognizers>
+                <TapGestureRecognizer Tapped="OnShowExampleTapped" />
+              </Border.GestureRecognizers>
+            </Border>
+            <!-- Wrap Editor in Border to capture taps even when disabled -->
+            <Border x:Name="EditorContainer" StrokeThickness="1" Stroke="#E7E7E7" StrokeShape="RoundRectangle 8" BackgroundColor="White" Padding="0">
+              <Editor x:Name="PasteEditor" Placeholder="Tap to enable or click 'Show Example Format' button" PlaceholderColor="#60717F" FontSize="13" HeightRequest="160" TextColor="{StaticResource TextPrimary}"
+                      IsEnabled="False"
+                      VerticalOptions="Start"
+                      AutoSize="TextChanges"
+                      BackgroundColor="Transparent"
+                      SemanticProperties.Description="Paste flashcard text field"
+                      SemanticProperties.Hint="Paste formatted text with question and answer pairs in the format pipe question colon answer pipe" />
+              <Border.GestureRecognizers>
+                <TapGestureRecognizer Tapped="OnEditorTapped" />
+              </Border.GestureRecognizers>
+            </Border>
             <!-- Processing spinner shown while parsing/creating cards -->
             <ActivityIndicator x:Name="ProcessingIndicator" IsVisible="False" IsRunning="False" Color="{StaticResource PrimaryDark}"
                                SemanticProperties.Description="Processing flashcards indicator"

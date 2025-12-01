@@ -34,7 +34,6 @@ public partial class AddFlashcardsPage : ContentPage
     bool _navigatingForward;
     bool _aiEnvReady = false; // track environment readiness
     bool _cardsAdded = false; // track if user actually added cards
-    bool _isProgrammaticTextChange = false; // flag to prevent TextChanged events during prefill
 
     public AddFlashcardsPage() { InitializeComponent(); }
 
@@ -47,48 +46,13 @@ public partial class AddFlashcardsPage : ContentPage
         _navigatingForward = false;
         TryUpdateDeckTitle();
         
-        // Prefill editor BEFORE animation to avoid visual glitches
-        try
-        {
-            if (PasteEditor != null && string.IsNullOrWhiteSpace(PasteEditor.Text))
-            {
-                _isProgrammaticTextChange = true;
-                
-                // Set text directly without triggering events
-                PasteEditor.Text = "|(An array of components designed to accomplish a particular objective according to plan.:System)|\n" +
-                                   "|(List the OSI Layers:/n1. Physical/n2. Data Link/n3. Network/n4. Transport/n5. Session/n6. Presentation/n7. Application)|\n" +
-                                   "|(HTTP Methods:/nGET/nPOST/nPUT/nDELETE:n/a)|\n";
-                
-                // Move cursor to the beginning to prevent scroll to end
-                PasteEditor.CursorPosition = 0;
-                
-                // Explicitly unfocus to prevent any focus-related scrolling
-                PasteEditor.Unfocus();
-                
-                _isProgrammaticTextChange = false;
-            }
-        }
-        catch 
-        { 
-            _isProgrammaticTextChange = false;
-        }
+        // Editor starts disabled to prevent auto-focus and scrolling
+        // It will be enabled when user taps it or clicks "Show Example"
         
-        // Run slide animation after text is set
+        // Run slide animation
         await AnimHelpers.SlideFadeInAsync(Content);
         
-        // Force scroll to top after animation completes
-        try
-        {
-            await Task.Delay(150); // Increased delay to ensure animation is complete
-            var scrollView = this.FindByName<ScrollView>("MainScrollView");
-            if (scrollView != null)
-            {
-                await scrollView.ScrollToAsync(0, 0, false);
-            }
-        }
-        catch { }
-        
-        // load environment flag
+        // Load environment flag
         _aiEnvReady = Preferences.Get("ai_env_ready", false);
     }
 
@@ -149,6 +113,75 @@ public partial class AddFlashcardsPage : ContentPage
 
     async void OnClose(object? s, TappedEventArgs e)
     { try { await Shell.Current.GoToAsync("///TitleReviewerPage"); } catch { await Navigation.PopAsync(); } }
+
+    void OnEditorTapped(object? sender, TappedEventArgs e)
+    {
+        try
+        {
+            // Enable the Editor when user taps on it
+            if (PasteEditor != null && !PasteEditor.IsEnabled)
+            {
+                PasteEditor.IsEnabled = true;
+                
+                // Focus the Editor after a small delay to ensure it's ready
+                MainThread.BeginInvokeOnMainThread(async () =>
+                {
+                    await Task.Delay(50);
+                    PasteEditor?.Focus();
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[AddFlashcardsPage] Failed to enable editor: {ex.Message}");
+        }
+    }
+
+    void OnShowExampleTapped(object? sender, TappedEventArgs e)
+    {
+        try
+        {
+            // Enable the Editor first if it's disabled
+            if (PasteEditor != null && !PasteEditor.IsEnabled)
+            {
+                PasteEditor.IsEnabled = true;
+            }
+            
+            if (PasteEditor != null)
+            {
+                // Insert example format at cursor position or replace all text if empty
+                var exampleText = "|(An array of components designed to accomplish a particular objective according to plan.:System)|\n" +
+                                  "|(List the OSI Layers:/n1. Physical/n2. Data Link/n3. Network/n4. Transport/n5. Session/n6. Presentation/n7. Application)|\n" +
+                                  "|(HTTP Methods:/nGET/nPOST/nPUT/nDELETE:n/a)|\n";
+                
+                if (string.IsNullOrWhiteSpace(PasteEditor.Text))
+                {
+                    PasteEditor.Text = exampleText;
+                }
+                else
+                {
+                    // Insert at current cursor position
+                    var cursorPos = PasteEditor.CursorPosition;
+                    var currentText = PasteEditor.Text ?? string.Empty;
+                    PasteEditor.Text = currentText.Insert(cursorPos, exampleText);
+                    PasteEditor.CursorPosition = cursorPos + exampleText.Length;
+                }
+                
+                // Focus the Editor after inserting text
+                PasteEditor.Focus();
+                
+                // Clear any previous result messages
+                if (PasteResultLabel != null)
+                {
+                    PasteResultLabel.Text = string.Empty;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[AddFlashcardsPage] Failed to show example: {ex.Message}");
+        }
+    }
 
     async void OnTypeFlashcards(object? s, TappedEventArgs e)
     { 
