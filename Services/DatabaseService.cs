@@ -3,6 +3,7 @@ using mindvault.Data;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using System.Collections.Concurrent;
+using System.Diagnostics;
 
 namespace mindvault.Services;
 
@@ -13,9 +14,29 @@ public class DatabaseService
     // Simple in-memory cache of flashcards per reviewer to speed repeated loads
     readonly ConcurrentDictionary<int, List<Flashcard>> _flashcardCache = new();
 
-    public DatabaseService(string dbPath)
+    /// <summary>
+    /// Creates a new DatabaseService with SQLCipher encryption.
+    /// </summary>
+    /// <param name="dbPath">Path to the database file</param>
+    /// <param name="encryptionKey">Encryption key for SQLCipher (Base64 encoded)</param>
+    public DatabaseService(string dbPath, string? encryptionKey = null)
     {
-        _db = new SQLiteAsyncConnection(dbPath);
+        // SQLCipher connection string with encryption
+        if (!string.IsNullOrEmpty(encryptionKey))
+        {
+            var connectionString = new SQLiteConnectionString(dbPath, 
+                SQLiteOpenFlags.ReadWrite | SQLiteOpenFlags.Create | SQLiteOpenFlags.FullMutex,
+                storeDateTimeAsTicks: true,
+                key: encryptionKey);
+            _db = new SQLiteAsyncConnection(connectionString);
+            Debug.WriteLine("[DatabaseService] Database initialized with SQLCipher encryption");
+        }
+        else
+        {
+            // Fallback to unencrypted (not recommended for production)
+            _db = new SQLiteAsyncConnection(dbPath);
+            Debug.WriteLine("[DatabaseService] WARNING: Database initialized WITHOUT encryption");
+        }
     }
 
     public async Task InitializeAsync()

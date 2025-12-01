@@ -10,6 +10,10 @@ public static class MauiProgram
 {
     public static MauiApp CreateMauiApp()
     {
+        // Initialize SQLCipher before any database operations
+        // The bundle_e_sqlcipher package automatically provides the encrypted SQLite provider
+        SQLitePCL.Batteries_V2.Init();
+        
         var builder = MauiApp.CreateBuilder();
 
         builder.UseMauiApp<App>()
@@ -47,11 +51,52 @@ public static class MauiProgram
 #endif
                });
 
-        // Database service
+        // Encryption key service (must be registered first)
+        builder.Services.AddSingleton<EncryptionKeyService>();
+
+        // Database migration service
+        builder.Services.AddSingleton<DatabaseMigrationService>();
+
+        // Database service with encryption
         builder.Services.AddSingleton(sp =>
         {
             var dbPath = Path.Combine(FileSystem.AppDataDirectory, "mindvault.db3");
-            var db = new DatabaseService(dbPath);
+            
+            // Get or create encryption key
+            var keyService = sp.GetRequiredService<EncryptionKeyService>();
+            string encryptionKey;
+            try
+            {
+                encryptionKey = keyService.GetOrCreateKeyAsync().GetAwaiter().GetResult();
+                System.Diagnostics.Debug.WriteLine("[MauiProgram] Database encryption key retrieved successfully");
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[MauiProgram] Failed to get encryption key: {ex.Message}");
+                throw new InvalidOperationException("Failed to initialize database encryption", ex);
+            }
+
+            // Check if migration is needed (unencrypted -> encrypted)
+            var migrationService = sp.GetRequiredService<DatabaseMigrationService>();
+            bool needsMigration = migrationService.NeedsMigrationAsync().GetAwaiter().GetResult();
+            
+            if (needsMigration)
+            {
+                System.Diagnostics.Debug.WriteLine("[MauiProgram] Unencrypted database detected, starting automatic migration...");
+                var (success, message) = migrationService.MigrateToEncryptedAsync(encryptionKey).GetAwaiter().GetResult();
+                
+                if (success)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[MauiProgram] Migration successful: {message}");
+                }
+                else
+                {
+                    System.Diagnostics.Debug.WriteLine($"[MauiProgram] Migration failed: {message}");
+                    throw new InvalidOperationException($"Database migration failed: {message}");
+                }
+            }
+            
+            var db = new DatabaseService(dbPath, encryptionKey);
             Task.Run(() => db.InitializeAsync()).Wait();
             return db;
         });
