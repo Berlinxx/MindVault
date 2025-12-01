@@ -20,6 +20,9 @@ public partial class PlayerBuzzPage : ContentPage
     private Border? _timerPanel;
     private Label? _timerLabel;
     private Label? _questionBadge;
+    private Border? _buzzWinnerBanner;
+    private Label? _buzzWinnerName;
+    private Image? _buzzWinnerAvatar;
 
     private IAudioPlayer? _tickPlayer;
     private IAudioPlayer? _timeupPlayer;
@@ -48,6 +51,9 @@ public partial class PlayerBuzzPage : ContentPage
         _timerPanel = this.FindByName<Border>("TimerPanel");
         _timerLabel = this.FindByName<Label>("TimerLabel");
         _questionBadge = this.FindByName<Label>("QuestionBadge");
+        _buzzWinnerBanner = this.FindByName<Border>("BuzzWinnerBanner");
+        _buzzWinnerName = this.FindByName<Label>("BuzzWinnerName");
+        _buzzWinnerAvatar = this.FindByName<Image>("BuzzWinnerAvatar");
 
         _multi.ClientParticipantJoined += OnClientParticipantJoined;
         _multi.ClientParticipantLeft += OnClientParticipantLeft;
@@ -193,6 +199,32 @@ public partial class PlayerBuzzPage : ContentPage
         _suppressTimeup = false;
         var remaining = TimeSpan.FromTicks(Math.Max(0, deadlineTicks - DateTime.UtcNow.Ticks));
         StartCountdown(remaining <= TimeSpan.Zero ? TimeSpan.FromSeconds(10) : remaining);
+        
+        // Show buzz winner banner
+        MainThread.BeginInvokeOnMainThread(async () =>
+        {
+            if (_buzzWinnerName != null)
+                _buzzWinnerName.Text = name;
+            
+            // Get avatar for the buzz winner
+            if (_buzzWinnerAvatar != null)
+            {
+                var avatar = _avatars.TryGetValue(id, out var av) ? av : "avatar1.png";
+                _buzzWinnerAvatar.Source = avatar;
+            }
+            
+            // Animate banner sliding down from top
+            if (_buzzWinnerBanner != null)
+            {
+                _buzzWinnerBanner.IsVisible = true;
+                _buzzWinnerBanner.TranslationY = -100;
+                _buzzWinnerBanner.Opacity = 0;
+                await Task.WhenAll(
+                    _buzzWinnerBanner.TranslateTo(0, 0, 400, Easing.CubicOut),
+                    _buzzWinnerBanner.FadeTo(1, 300)
+                );
+            }
+        });
     }
 
     private void OnClientStopTimer(string id)
@@ -220,6 +252,7 @@ public partial class PlayerBuzzPage : ContentPage
         MainThread.BeginInvokeOnMainThread(() =>
         {
             if (_timerPanel is not null) _timerPanel.IsVisible = false;
+            if (_buzzWinnerBanner is not null) _buzzWinnerBanner.IsVisible = false;
         });
     }
 
@@ -247,6 +280,13 @@ public partial class PlayerBuzzPage : ContentPage
         _suppressTimeup = true;
         StopTimerUI();
         StopTimeupSound();
+        
+        // Hide buzz winner banner
+        MainThread.BeginInvokeOnMainThread(() =>
+        {
+            if (_buzzWinnerBanner != null)
+                _buzzWinnerBanner.IsVisible = false;
+        });
     }
 
     private void StartCountdown(TimeSpan duration)

@@ -76,6 +76,40 @@
         <Label x:Name="QuestionBadge" Text="Question 1 of 5" FontSize="30" TextColor="White" HorizontalTextAlignment="Center" FontAttributes="Bold" Margin="0,30,0,40"
                SemanticProperties.Description="Question progress"/>
 
+        <!-- Buzz Winner Banner (shown when someone buzzes) -->
+        <Border x:Name="BuzzWinnerBanner" IsVisible="False" Margin="0,0,0,20"
+                BackgroundColor="{StaticResource Surface}" StrokeThickness="0" StrokeShape="RoundRectangle 18" Padding="16,12"
+                SemanticProperties.Description="First player to buzz in"
+                SemanticProperties.Hint="Shows which player will answer the question">
+          <VerticalStackLayout Spacing="10">
+            <Label Text="🔔 BUZZING IN!" FontSize="12" FontAttributes="Bold" TextColor="{StaticResource Primary}"
+                   HorizontalTextAlignment="Center"
+                   SemanticProperties.Description="Buzz notification"/>
+            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12" HorizontalOptions="Center">
+              <!-- Avatar -->
+              <Border Grid.Column="0" WidthRequest="50" HeightRequest="50"
+                      StrokeShape="Ellipse" StrokeThickness="2" Stroke="{StaticResource Primary}"
+                      BackgroundColor="#E8DFFB"
+                      SemanticProperties.Description="Player avatar">
+                <Image x:Name="BuzzWinnerAvatar" Source="avatar1.png" Aspect="AspectFill"
+                       AutomationProperties.IsInAccessibleTree="False">
+                  <Image.Clip>
+                    <EllipseGeometry Center="25,25" RadiusX="25" RadiusY="25"/>
+                  </Image.Clip>
+                </Image>
+              </Border>
+              <!-- Name -->
+              <VerticalStackLayout Grid.Column="1" VerticalOptions="Center" Spacing="2">
+                <Label x:Name="BuzzWinnerName" Text="Player Name" FontSize="18" FontAttributes="Bold"
+                       TextColor="{StaticResource TextPrimary}"
+                       SemanticProperties.Description="Player name who buzzed"/>
+                <Label Text="will answer!" FontSize="12" TextColor="{StaticResource TextSecondary}"
+                       SemanticProperties.Description="Status text"/>
+              </VerticalStackLayout>
+            </Grid>
+          </VerticalStackLayout>
+        </Border>
+
       <!-- Big Bell Icon -->
       <Border x:Name="Bell" WidthRequest="200" HeightRequest="200"
               BackgroundColor="#F2B51E" StrokeThickness="0"

@@ -55,6 +55,41 @@
       <Grid Grid.Row="0" Grid.Column="0"
             HorizontalOptions="{OnIdiom Phone=Center, Desktop=FillAndExpand}"
             MaximumWidthRequest="{OnIdiom Phone=500, Desktop=600}">
+        
+        <!-- Buzz Winner Banner (shown above flashcard when someone buzzes) -->
+        <Border x:Name="HostBuzzBanner" IsVisible="{Binding HasBuzzWinner}" Margin="0,0,0,10" VerticalOptions="Start"
+                BackgroundColor="{StaticResource Surface}" StrokeThickness="0" StrokeShape="RoundRectangle 18" Padding="16,12"
+                SemanticProperties.Description="First player to buzz in"
+                SemanticProperties.Hint="Shows which player will answer the question">
+          <VerticalStackLayout Spacing="10">
+            <Label Text="🔔 BUZZING IN!" FontSize="12" FontAttributes="Bold" TextColor="{StaticResource Primary}"
+                   HorizontalTextAlignment="Center"
+                   SemanticProperties.Description="Buzz notification"/>
+            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12" HorizontalOptions="Center">
+              <!-- Avatar -->
+              <Border Grid.Column="0" WidthRequest="50" HeightRequest="50"
+                      StrokeShape="Ellipse" StrokeThickness="2" Stroke="{StaticResource Primary}"
+                      BackgroundColor="#E8DFFB"
+                      SemanticProperties.Description="Player avatar">
+                <Image Source="{Binding BuzzAvatar}" Aspect="AspectFill"
+                       AutomationProperties.IsInAccessibleTree="False">
+                  <Image.Clip>
+                    <EllipseGeometry Center="25,25" RadiusX="25" RadiusY="25"/>
+                  </Image.Clip>
+                </Image>
+              </Border>
+              <!-- Name -->
+              <VerticalStackLayout Grid.Column="1" VerticalOptions="Center" Spacing="2">
+                <Label Text="{Binding BuzzWinner}" FontSize="18" FontAttributes="Bold"
+                       TextColor="{StaticResource TextPrimary}"
+                       SemanticProperties.Description="Player name who buzzed"/>
+                <Label Text="will answer!" FontSize="12" TextColor="{StaticResource TextSecondary}"
+                       SemanticProperties.Description="Status text"/>
+              </VerticalStackLayout>
+            </Grid>
+          </VerticalStackLayout>
+        </Border>
+        
         <Border BackgroundColor="{StaticResource Surface}" StrokeThickness="0" StrokeShape="RoundRectangle 22"
                 HeightRequest="420" Margin="0,6,0,0" HorizontalOptions="FillAndExpand" Padding="14"
                 SemanticProperties.Description="Flashcard"

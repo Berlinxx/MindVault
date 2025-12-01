@@ -178,6 +178,19 @@ public partial class HostJudgePage : ContentPage
                 BuzzAvatar = string.IsNullOrEmpty(p.Avatar) ? "avatar1.png" : p.Avatar; 
                 _lastWinnerId = p.Id;
                 
+                // Animate buzz banner sliding down from top
+                var banner = this.FindByName<Border>("HostBuzzBanner");
+                if (banner != null)
+                {
+                    await Task.Delay(50);
+                    banner.TranslationY = -100;
+                    banner.Opacity = 0;
+                    await Task.WhenAll(
+                        banner.TranslateTo(0, 0, 400, Easing.CubicOut),
+                        banner.FadeTo(1, 300)
+                    );
+                }
+                
                 // Animate first judge bar sliding in from left
                 await Task.Delay(50); // Small delay to ensure visibility is set
                 JudgeBar.TranslationX = -400; // Start off-screen to the left
