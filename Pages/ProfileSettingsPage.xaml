@@ -22,7 +22,9 @@
       </Grid.RowDefinitions>
 
       <!-- Title -->
-      <Label Grid.Row="0" Text="Profile Settings" FontSize="20" FontAttributes="Bold" HorizontalTextAlignment="Center"/>
+      <Label Grid.Row="0" Text="Profile Settings" FontSize="20" FontAttributes="Bold" HorizontalTextAlignment="Center"
+             SemanticProperties.HeadingLevel="Level1"
+             SemanticProperties.Description="Profile Settings page heading" />
 
       <!-- Avatar preview -->
       <Border Grid.Row="1"
@@ -30,7 +32,8 @@
               Margin="0,8,0,16"
               HeightRequest="140" WidthRequest="140"
               StrokeThickness="0"
-              BackgroundColor="#FFFFFF">
+              BackgroundColor="#FFFFFF"
+              SemanticProperties.Description="Selected avatar preview">
         <Border.StrokeShape>
           <Ellipse/>
         </Border.StrokeShape>
@@ -44,7 +47,9 @@
                       ItemsSource="{Binding Avatars}"
                       SelectionMode="Single"
                       SelectedItem="{Binding SelectedAvatar, Mode=TwoWay}"
-                      HeightRequest="100">
+                      HeightRequest="100"
+                      SemanticProperties.Description="Avatar picker"
+                      SemanticProperties.Hint="Swipe to browse and select your profile avatar">
         <CollectionView.ItemsLayout>
           <LinearItemsLayout Orientation="Horizontal" ItemSpacing="14"/>
         </CollectionView.ItemsLayout>
@@ -78,21 +83,32 @@
       </CollectionView>
 
       <!-- Gender label -->
-      <Label Grid.Row="3" Text="SELECT GENDER :" Margin="0,24,0,10" TextColor="#555" FontAttributes="Bold"/>
+      <Label Grid.Row="3" Text="SELECT GENDER :" Margin="0,24,0,10" TextColor="#555" FontAttributes="Bold"
+             SemanticProperties.HeadingLevel="Level2"
+             SemanticProperties.Description="Gender selection section" />
 
       <!-- Gender icons -->
       <Grid Grid.Row="4" ColumnDefinitions="*,*,*" HorizontalOptions="Fill" Margin="0,0,0,12">
-        <Label x:Name="FemaleIcon" Grid.Column="0" Text="&#xF221;" FontFamily="FAS" FontSize="52" TextColor="#FF2B78" HorizontalOptions="Center" VerticalOptions="Center">
+        <Label x:Name="FemaleIcon" Grid.Column="0" Text="&#xF221;" FontFamily="FontAwesome6FreeSolid" FontSize="52" TextColor="#FF2B78" HorizontalOptions="Center" VerticalOptions="Center"
+               ToolTipProperties.Text="Select female"
+               SemanticProperties.Description="Female gender option"
+               SemanticProperties.Hint="Selects female as your gender">
           <Label.GestureRecognizers>
             <TapGestureRecognizer Tapped="OnFemaleTapped"/>
           </Label.GestureRecognizers>
         </Label>
-        <Label x:Name="MaleIcon" Grid.Column="1" Text="&#xF222;" FontFamily="FAS" FontSize="52" TextColor="#1EA1FF" HorizontalOptions="Center" VerticalOptions="Center">
+        <Label x:Name="MaleIcon" Grid.Column="1" Text="&#xF222;" FontFamily="FontAwesome6FreeSolid" FontSize="52" TextColor="#1EA1FF" HorizontalOptions="Center" VerticalOptions="Center"
+               ToolTipProperties.Text="Select male"
+               SemanticProperties.Description="Male gender option"
+               SemanticProperties.Hint="Selects male as your gender">
           <Label.GestureRecognizers>
             <TapGestureRecognizer Tapped="OnMaleTapped"/>
           </Label.GestureRecognizers>
         </Label>
-        <Label x:Name="OtherIcon" Grid.Column="2" Text="&#xF128;" FontFamily="FAS" FontSize="52" TextColor="#444" HorizontalOptions="Center" VerticalOptions="Center">
+        <Label x:Name="OtherIcon" Grid.Column="2" Text="&#xF128;" FontFamily="FontAwesome6FreeSolid" FontSize="52" TextColor="#444" HorizontalOptions="Center" VerticalOptions="Center"
+               ToolTipProperties.Text="Select other/prefer not to say"
+               SemanticProperties.Description="Other gender option"
+               SemanticProperties.Hint="Selects other or prefer not to say as your gender">
           <Label.GestureRecognizers>
             <TapGestureRecognizer Tapped="OnOtherTapped"/>
           </Label.GestureRecognizers>
@@ -101,7 +117,9 @@
 
       <!-- Name input -->
       <VerticalStackLayout Grid.Row="5" Spacing="14">
-        <Label Text="USERNAME :" Margin="0,4,0,8" TextColor="#555" FontAttributes="Bold"/>
+        <Label Text="USERNAME :" Margin="0,4,0,8" TextColor="#555" FontAttributes="Bold"
+               SemanticProperties.HeadingLevel="Level2"
+               SemanticProperties.Description="Username section" />
         <Border Stroke="#DDD" StrokeThickness="1" StrokeShape="RoundRectangle 22">
           <Entry x:Name="UsernameEntry"
                  Placeholder="Enter a username"
@@ -110,7 +128,9 @@
                  TextColor="#111"
                  PlaceholderColor="#999"
                  ClearButtonVisibility="WhileEditing"
-                 Margin="16,8"/>
+                 Margin="16,8"
+                 SemanticProperties.Description="Username text field"
+                 SemanticProperties.Hint="Enter your username" />
         </Border>
         <Button Text="SAVE"
                 HorizontalOptions="Center"
@@ -121,7 +141,10 @@
                 TextColor="White"
                 FontAttributes="Bold"
                 Margin="0,6,0,0"
-                Clicked="OnSaveClicked"/>
+                Clicked="OnSaveClicked"
+                ToolTipProperties.Text="Save profile changes"
+                SemanticProperties.Description="Save button"
+                SemanticProperties.Hint="Saves your profile settings" />
       </VerticalStackLayout>
     </Grid>
   </Grid>

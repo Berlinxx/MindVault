@@ -93,7 +93,9 @@
         <Label Grid.Column="1" Text="MULTIPLAYER MODE"
                FontAttributes="Bold" FontSize="18"
                TextColor="{StaticResource TextPrimary}"
-               VerticalOptions="Center" />
+               VerticalOptions="Center"
+               SemanticProperties.HeadingLevel="Level1"
+               SemanticProperties.Description="Multiplayer Mode page heading" />
      
       </Grid>
     </Border>
@@ -107,13 +109,15 @@
           <VerticalStackLayout Spacing="12" HorizontalOptions="Fill">
             <Border BackgroundColor="#F3F6FF" StrokeThickness="0" StrokeShape="Ellipse"
                     WidthRequest="72" HeightRequest="72" HorizontalOptions="Center">
-              <Label Text="&#xF0E7;" FontFamily="FAS" FontSize="28"
+              <Label Text="&#xF0E7;" FontFamily="FontAwesome6FreeSolid" FontSize="28"
                      HorizontalOptions="Center" VerticalOptions="Center"
                      TextColor="{StaticResource PrimaryDark}" />
             </Border>
             <Label Text="MULTIPLAYER MODE" FontAttributes="Bold"
                    FontSize="18" TextColor="{StaticResource TextPrimary}"
-                   HorizontalTextAlignment="Center"/>
+                   HorizontalTextAlignment="Center"
+                   SemanticProperties.HeadingLevel="Level2"
+                   SemanticProperties.Description="Multiplayer mode section" />
           </VerticalStackLayout>
         </Border>
 
@@ -122,10 +126,13 @@
           <VerticalStackLayout Spacing="16">
 
             <!-- HOST -->
-            <Border Style="{StaticResource ActionButton}">
+            <Border Style="{StaticResource ActionButton}"
+                    ToolTipProperties.Text="Host a multiplayer game session"
+                    SemanticProperties.Description="Host game button"
+                    SemanticProperties.Hint="Creates a new multiplayer room and generates a room code for others to join">
               <VerticalStackLayout Spacing="10">
                 <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10">
-                  <Label Text="&#xF51E;" FontFamily="FAS" FontSize="16" TextColor="White"
+                  <Label Text="&#xF51E;" FontFamily="FontAwesome6FreeSolid" FontSize="16" TextColor="White"
                          VerticalOptions="Center"/>
                   <Label Grid.Column="1" Text="HOST" TextColor="White"
                          FontAttributes="Bold" FontSize="18" VerticalOptions="Center"/>
@@ -141,7 +148,7 @@
             <Border Style="{StaticResource ActionButton}">
               <VerticalStackLayout Spacing="10">
                 <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10">
-                  <Label Text="&#xF0C0;" FontFamily="FAS" FontSize="16" TextColor="White"
+                  <Label Text="&#xF0C0;" FontFamily="FontAwesome6FreeSolid" FontSize="16" TextColor="White"
                          VerticalOptions="Center"/>
                   <Label Grid.Column="1" Text="JOIN ROOM" TextColor="White"
                          FontAttributes="Bold" FontSize="18" VerticalOptions="Center"/>
@@ -166,7 +173,9 @@
                            VerticalOptions="Center"
                            Margin="0,-2,0,0"
                            TextChanged="OnRoomCodeTextChanged"
-                           Completed="OnJoinCompleted" />
+                           Completed="OnJoinCompleted"
+                           SemanticProperties.Description="Room code text field"
+                           SemanticProperties.Hint="Enter the 5-letter room code from the host" />
 
                     <Border x:Name="JoinBtn"
                             Grid.Column="1"
@@ -175,9 +184,12 @@
                             BackgroundColor="White"
                             StrokeThickness="0"
                             Opacity="0.5"
-                            InputTransparent="True">
+                            InputTransparent="True"
+                            ToolTipProperties.Text="Join room with code"
+                            SemanticProperties.Description="Join room button"
+                            SemanticProperties.Hint="Joins the multiplayer room with the entered code">
                       <Label x:Name="JoinIcon"
-                             Text="&#xF00C;" FontFamily="FAS" FontSize="16"
+                             Text="&#xF00C;" FontFamily="FontAwesome6FreeSolid" FontSize="16"
                              TextColor="#93CFF9"
                              HorizontalOptions="Center" VerticalOptions="Center" />
                       <Border.GestureRecognizers>

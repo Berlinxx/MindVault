@@ -47,26 +47,28 @@
 
     <Grid x:Name="SummaryGrid">
         <!-- Summary Section -->
-        <ScrollView x:Name="SummarySection">
+        <ScrollView x:Name="SummarySection" HorizontalOptions="{OnPlatform Android=Center, Default=Fill}" VerticalOptions="{OnPlatform Android=Center, Default=Start}">
             <Grid HorizontalOptions="Center">
                 <VerticalStackLayout Spacing="20"
-                                     Padding="28,48,28,32"
+                                     Padding="{OnPlatform Android='28,0,28,32', Default='28,48,28,32'}"
                                      WidthRequest="{OnPlatform Android=340, Default=-1}"
-                                     MaximumWidthRequest="420">
+                                     MaximumWidthRequest="420"
+                                     HorizontalOptions="Center"
+                                     VerticalOptions="Center">
                     <Image Source="logo.png" HeightRequest="72" WidthRequest="72" HorizontalOptions="Center" />
                     <Label Text="Session Complete!" FontAttributes="Bold" FontSize="22" TextColor="White" HorizontalTextAlignment="Center" />
 
                     <Grid ColumnDefinitions="*,*" ColumnSpacing="22" Padding="0,8">
                         <Border BackgroundColor="#E4EBF3" StrokeShape="RoundRectangle 16" Padding="16" Grid.Column="0">
                             <VerticalStackLayout Spacing="4" HorizontalOptions="Center">
-                                <Label Text="Correct:" FontSize="12" TextColor="#0D3848" />
-                                <Label Text="{Binding Correct}" FontSize="30" FontAttributes="Bold" TextColor="#0D3848" />
+                                <Label Text="Correct:" FontSize="12" TextColor="{StaticResource CorrectColor}" FontAttributes="Bold" HorizontalTextAlignment="Center" />
+                                <Label  Text="{Binding Correct}" FontSize="36" FontAttributes="Bold" TextColor="{StaticResource CorrectColor}" HorizontalOptions="Center" HorizontalTextAlignment="Center" />
                             </VerticalStackLayout>
                         </Border>
                         <Border BackgroundColor="#E4EBF3" StrokeShape="RoundRectangle 16" Padding="16" Grid.Column="1">
                             <VerticalStackLayout Spacing="4" HorizontalOptions="Center">
-                                <Label Text="Wrong:" FontSize="12" TextColor="#0D3848" />
-                                <Label Text="{Binding Wrong}" FontSize="30" FontAttributes="Bold" TextColor="#0D3848" />
+                                <Label Text="Wrong:" FontSize="12" TextColor="{StaticResource WrongColor}" FontAttributes="Bold" HorizontalTextAlignment="Center" />
+                                <Label Text="{Binding Wrong}" FontSize="36" FontAttributes="Bold" TextColor="{StaticResource WrongColor}" HorizontalOptions="Center" HorizontalTextAlignment="Center" />
                             </VerticalStackLayout>
                         </Border>
                     </Grid>
@@ -83,23 +85,38 @@
             </Grid>
         </ScrollView>
 
-        <!-- Mistakes Section -->
-        <ScrollView x:Name="MistakesSection" IsVisible="{Binding HasMistakes}">
-            <VerticalStackLayout Spacing="18" Padding="24,56,24,32">
-                <Label Text="Review Mistakes" FontSize="20" FontAttributes="Bold" TextColor="White" HorizontalTextAlignment="Center" />
-                <CollectionView ItemsSource="{Binding Mistakes}" SelectionMode="None">
-                    <CollectionView.ItemTemplate>
-                        <DataTemplate>
-                            <Border BackgroundColor="#E4EBF3" StrokeShape="RoundRectangle 14" Padding="14" Margin="0,0,0,4">
-                                <VerticalStackLayout Spacing="6">
-                                    <Label Text="{Binding Q}" FontAttributes="Bold" TextColor="#0D3848" />
-                                    <Label Text="{Binding A}" TextColor="#0D3848" />
-                                </VerticalStackLayout>
-                            </Border>
-                        </DataTemplate>
-                    </CollectionView.ItemTemplate>
-                </CollectionView>
-            </VerticalStackLayout>
-        </ScrollView>
+        <!-- Mistakes Section: fixed header, scrollable content below -->
+        <Grid x:Name="MistakesSection" IsVisible="{Binding HasMistakes}">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+
+            <!-- Fixed header (will not scroll) -->
+            <Label Text="Review Mistakes"
+                   FontSize="20"
+                   FontAttributes="Bold"
+                   TextColor="White"
+                   HorizontalTextAlignment="Center"
+                   Padding="24,24,24,0"
+                   Grid.Row="0" />
+
+            <!-- Scrollable list of mistakes (CollectionView handles its own scrolling) -->
+            <CollectionView ItemsSource="{Binding Mistakes}"
+                            SelectionMode="None"
+                            Grid.Row="1"
+                            Margin="24,16,24,32">
+                <CollectionView.ItemTemplate>
+                    <DataTemplate>
+                        <Border BackgroundColor="#E4EBF3" StrokeShape="RoundRectangle 14" Padding="14" Margin="0,0,0,4">
+                            <VerticalStackLayout Spacing="6">
+                                <Label Text="{Binding Q}" FontAttributes="Bold" TextColor="#0D3848" />
+                                <Label Text="{Binding A}" TextColor="#0D3848" />
+                            </VerticalStackLayout>
+                        </Border>
+                    </DataTemplate>
+                </CollectionView.ItemTemplate>
+            </CollectionView>
+        </Grid>
     </Grid>
 </ContentPage>

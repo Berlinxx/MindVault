@@ -71,7 +71,7 @@
     </LinearGradientBrush>
   </ContentPage.Background>
 
-  <Grid RowDefinitions="Auto,*">
+  <Grid x:Name="RootGrid" RowDefinitions="Auto,*">
     
     <!-- HEADER -->
     <Border Grid.Row="0" BackgroundColor="White" StrokeThickness="0"
@@ -82,7 +82,7 @@
         <Border WidthRequest="34" HeightRequest="34"
                 Stroke="#E8EDF2" StrokeThickness="1"
                 StrokeShape="Ellipse" BackgroundColor="White">
-          <Label Text="&#xF060;" FontFamily="FAS" FontSize="14" TextColor="{StaticResource TextPrimary}"
+          <Label Text="&#xF060;" FontFamily="FontAwesome6FreeSolid" FontSize="14" TextColor="{StaticResource TextPrimary}"
                  HorizontalOptions="Center" VerticalOptions="Center"/>
           <Border.GestureRecognizers>
             <TapGestureRecognizer Tapped="OnBackTapped"/>
@@ -119,13 +119,22 @@
           <Label Text="CHOOSE FLASHCARD:" FontSize="13" TextColor="{StaticResource TextSecondary}"
                  HorizontalTextAlignment="Center"/>
 
-          <Border Style="{StaticResource OutlineField}" HorizontalOptions="Center" WidthRequest="250">
-            <Picker Title="Sort..."
-                    ItemsSource="{Binding FlashcardOptions}"
-                    SelectedItem="{Binding SelectedFlashcard, Mode=TwoWay}"
-                    FontSize="14" TextColor="{StaticResource TextPrimary}"
-                    HorizontalOptions="Fill" />
-          </Border>
+          <!-- Custom Dropdown -->
+          <Grid HorizontalOptions="Center" WidthRequest="250">
+            <!-- Dropdown trigger button -->
+            <Border x:Name="FlashcardDropdownTrigger" Stroke="#E8EDF2" StrokeThickness="1"
+                    StrokeShape="RoundRectangle 8" Padding="12,10" BackgroundColor="#FFFFFF">
+              <Grid ColumnDefinitions="*,Auto">
+                <Label Grid.Column="0" Text="{Binding SelectedFlashcard}" 
+                       TextColor="#000000" FontSize="14" VerticalOptions="Center"/>
+                <Label Grid.Column="1" Text="&#xF078;" FontFamily="FontAwesome6FreeSolid" FontSize="10"
+                       VerticalOptions="Center" TextColor="#666666" Margin="8,0,0,0"/>
+              </Grid>
+              <Border.GestureRecognizers>
+                <TapGestureRecognizer Tapped="OnFlashcardDropdownTapped"/>
+              </Border.GestureRecognizers>
+            </Border>
+          </Grid>
         </VerticalStackLayout>
       </Border>
 
@@ -193,5 +202,38 @@
 
     </VerticalStackLayout>
   </ScrollView>
+
+    <!-- Dropdown options list (overlay popup) -->
+    <Border x:Name="FlashcardDropdownList" IsVisible="False" 
+            Grid.RowSpan="2"
+            Stroke="#31B6D8" StrokeThickness="2"
+            StrokeShape="RoundRectangle 8" 
+            BackgroundColor="#FFFFFF"
+            Padding="0"
+            Margin="0,180,0,0"
+            VerticalOptions="Start"
+            HorizontalOptions="Center"
+            WidthRequest="250"
+            ZIndex="1000">
+      <Border.Shadow>
+        <Shadow Opacity="0.2" Radius="8" Offset="0,4"/>
+      </Border.Shadow>
+      <CollectionView ItemsSource="{Binding FlashcardOptions}" SelectionMode="None">
+        <CollectionView.ItemsLayout>
+          <LinearItemsLayout Orientation="Vertical" ItemSpacing="0" />
+        </CollectionView.ItemsLayout>
+        <CollectionView.ItemTemplate>
+          <DataTemplate>
+            <Border BackgroundColor="#FFFFFF" Padding="12,10" StrokeThickness="0">
+              <Label Text="{Binding}" TextColor="#000000" FontSize="14"/>
+              <Border.GestureRecognizers>
+                <TapGestureRecognizer Tapped="OnFlashcardDropdownItemTapped" 
+                                      CommandParameter="{Binding}"/>
+              </Border.GestureRecognizers>
+            </Border>
+          </DataTemplate>
+        </CollectionView.ItemTemplate>
+      </CollectionView>
+    </Border>
   </Grid>
 </ContentPage>

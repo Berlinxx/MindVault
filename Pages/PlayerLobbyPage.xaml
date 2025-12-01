@@ -78,9 +78,13 @@
         <!-- Back button -->
         <Border WidthRequest="34" HeightRequest="34"
                 Stroke="#E8EDF2" StrokeThickness="1"
-                StrokeShape="Ellipse" BackgroundColor="White">
-          <Label Text="&#xF060;" FontFamily="FAS" FontSize="14" TextColor="{StaticResource TextPrimary}"
-                 HorizontalOptions="Center" VerticalOptions="Center"/>
+                StrokeShape="Ellipse" BackgroundColor="White"
+                ToolTipProperties.Text="Leave lobby and return"
+                SemanticProperties.Description="Back button"
+                SemanticProperties.Hint="Leaves the multiplayer lobby and returns to previous page">
+          <Label Text="&#xF060;" FontFamily="FontAwesome6FreeSolid" FontSize="14" TextColor="{StaticResource TextPrimary}"
+                 HorizontalOptions="Center" VerticalOptions="Center"
+                 AutomationProperties.IsInAccessibleTree="False"/>
           <Border.GestureRecognizers>
             <TapGestureRecognizer Tapped="OnBackTapped"/>
           </Border.GestureRecognizers>
@@ -89,7 +93,9 @@
         <Label Grid.Column="1" Text="PLAYER LOBBY"
                FontAttributes="Bold" FontSize="18"
                TextColor="{StaticResource TextPrimary}"
-               VerticalOptions="Center" HorizontalOptions="Center" />
+               VerticalOptions="Center" HorizontalOptions="Center"
+               SemanticProperties.HeadingLevel="Level1"
+               SemanticProperties.Description="Player Lobby page heading" />
         
         <!-- Spacer to balance the layout -->
         <Border Grid.Column="2" WidthRequest="34" HeightRequest="34"
@@ -106,19 +112,25 @@
         <Border Style="{StaticResource Card}">
           <VerticalStackLayout Spacing="12">
             <Border BackgroundColor="#F3F6FF" StrokeThickness="0" StrokeShape="Ellipse"
-                    WidthRequest="72" HeightRequest="72" HorizontalOptions="Center">
+                    WidthRequest="72" HeightRequest="72" HorizontalOptions="Center"
+                    SemanticProperties.Description="Multiplayer mode icon">
               <!-- swap to your logo image if you have one -->
-              <Label Text="&#xF0E7;" FontFamily="FAS" FontSize="28" TextColor="{StaticResource PrimaryDark}"
-                     HorizontalOptions="Center" VerticalOptions="Center"/>
+              <Label Text="&#xF0E7;" FontFamily="FontAwesome6FreeSolid" FontSize="28" TextColor="{StaticResource PrimaryDark}"
+                     HorizontalOptions="Center" VerticalOptions="Center"
+                     AutomationProperties.IsInAccessibleTree="False"/>
             </Border>
 
             <Label Text="MULTIPLAYER MODE" FontAttributes="Bold" FontSize="18"
-                   HorizontalTextAlignment="Center" TextColor="{StaticResource TextPrimary}"/>
+                   HorizontalTextAlignment="Center" TextColor="{StaticResource TextPrimary}"
+                   SemanticProperties.HeadingLevel="Level2"
+                   SemanticProperties.Description="Multiplayer Mode section"/>
 
             <Label Text="Alright Vaultees, here's the deal!" FontAttributes="Bold" FontSize="13"
-                   TextColor="{StaticResource TextPrimary}"/>
+                   TextColor="{StaticResource TextPrimary}"
+                   SemanticProperties.Description="Game introduction"/>
 
-            <Label FontSize="13" TextColor="{StaticResource TextSecondary}">
+            <Label FontSize="13" TextColor="{StaticResource TextSecondary}"
+                   SemanticProperties.Description="Game rules description">
               flashcards, a bell, and pure chaos. First one to smack the bell gets to answer, rack up points,
               and flex that big brain energy. Highest score takes the crown as Study Champ. Let the battle of wits begin!
             </Label>
@@ -129,9 +141,13 @@
         <Border Style="{StaticResource Card}">
           <VerticalStackLayout Spacing="12">
             <Label Text="{Binding ParticipantsHeader}" FontSize="14"
-                   TextColor="{StaticResource TextPrimary}" />
+                   TextColor="{StaticResource TextPrimary}"
+                   SemanticProperties.HeadingLevel="Level2"
+                   SemanticProperties.Description="Participants count" />
 
-            <CollectionView ItemsSource="{Binding Participants}" SelectionMode="None">
+            <CollectionView ItemsSource="{Binding Participants}" SelectionMode="None"
+                            SemanticProperties.Description="List of lobby participants"
+                            SemanticProperties.Hint="Shows all players currently in the lobby">
               <CollectionView.ItemsLayout>
                 <GridItemsLayout Orientation="Vertical" Span="4" />
               </CollectionView.ItemsLayout>
@@ -159,7 +175,10 @@
         </Border>
 
         <!-- READY CTA -->
-        <Border Style="{StaticResource PrimaryPill}" Margin="0,10,0,0">
+        <Border Style="{StaticResource PrimaryPill}" Margin="0,10,0,0"
+                ToolTipProperties.Text="Toggle ready status"
+                SemanticProperties.Description="Ready status button"
+                SemanticProperties.Hint="Toggles your ready status to indicate you are prepared to start the game">
           <Label Text="{Binding LocalReady, Converter={StaticResource ReadyTextConverter}}" TextColor="White" FontAttributes="Bold" FontSize="16"
                  HorizontalOptions="Center"/>
           <Border.GestureRecognizers>

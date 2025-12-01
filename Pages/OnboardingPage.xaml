@@ -27,7 +27,10 @@
               Padding="12,8"
               HorizontalOptions="End"
               VerticalOptions="Center"
-              Clicked="OnSkip" />
+              Clicked="OnSkip"
+              ToolTipProperties.Text="Skip onboarding"
+              SemanticProperties.Description="Skip button"
+              SemanticProperties.Hint="Skips the onboarding tutorial and goes to the app" />
     </Grid>
 
     <!-- [1] SLIDES -->
@@ -38,14 +41,16 @@
                     IsSwipeEnabled="True"
                     VerticalOptions="Fill"
                     HorizontalOptions="Fill"
-                    PositionChanged="OnPositionChanged">
+                    PositionChanged="OnPositionChanged"
+                    SemanticProperties.Description="Onboarding slides carousel"
+                    SemanticProperties.Hint="Swipe left or right to navigate between tutorial slides">
         <CarouselView.ItemTemplate>
           <DataTemplate x:DataType="vm:OnboardingSlide">
             <Grid RowDefinitions="*,Auto,Auto" RowSpacing="12" Padding="0,16,0,0">
               <!-- BIG ICON from Font Awesome -->
               <Label Grid.Row="0"
                      Text="{Binding Icon}"
-                     FontFamily="FAS"
+                     FontFamily="FontAwesome6FreeSolid"
                      FontSize="120"
                      HorizontalOptions="Center"
                      VerticalOptions="Center"
@@ -102,10 +107,13 @@
               BackgroundColor="white"
               Clicked="OnNext"
               HorizontalOptions="End"
-              VerticalOptions="Center">
+              VerticalOptions="Center"
+              ToolTipProperties.Text="Next slide"
+              SemanticProperties.Description="Next button"
+              SemanticProperties.Hint="Goes to the next onboarding slide">
         <Button.ImageSource>
           <FontImageSource Glyph="&#xF054;"
-                           FontFamily="FAS"
+                           FontFamily="FontAwesome6FreeSolid"
                            Size="20"
                            Color="#0D63B6"/>
         </Button.ImageSource>

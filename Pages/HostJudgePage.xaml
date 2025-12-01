@@ -25,91 +25,289 @@
     </LinearGradientBrush>
   </ContentPage.Background>
 
-  <ScrollView>
-    <VerticalStackLayout Spacing="16" Padding="16,20,16,28">
-
-      <!-- FLASHCARD PANEL -->
-      <Border BackgroundColor="{StaticResource Surface}" StrokeThickness="0" StrokeShape="RoundRectangle 22"
-              WidthRequest="350" HeightRequest="420" Margin="0,6,0,0" HorizontalOptions="Center" Padding="14">
-        <Grid RowDefinitions="Auto,*,Auto">
-          <!-- header: deck title -->
-          <Label Grid.Row="0" Text="Deck" FontAttributes="Bold" FontSize="16" TextColor="{StaticResource TextPrimary}"/>
-
-          <!-- center: question/answer text; tap to flip -->
-          <VerticalStackLayout Grid.Row="1" Spacing="8" HorizontalOptions="Center" VerticalOptions="Center">
-            <Label Text="Tap card to reveal the answer" FontSize="11" TextColor="{StaticResource TextSecondary}" HorizontalTextAlignment="Center"/>
-                        <Label Text="{Binding CurrentQuestion}" FontSize="20" TextColor="{StaticResource TextSecondary}" FontAttributes="Bold" HorizontalTextAlignment="Center"/>
-            <Label Text="{Binding CurrentAnswer}" FontSize="16" TextColor="{StaticResource TextSecondary}" HorizontalTextAlignment="Center"/>
-          </VerticalStackLayout>
-
-          <!-- bottom controls: audio icon (placeholder) -->
-          <Grid Grid.Row="2" ColumnDefinitions="*,Auto" Padding="0,2,0,0" Margin="8,0,8,8">
-            <Grid Grid.Column="0"/>
-            <Border Grid.Column="1" BackgroundColor="White" StrokeShape="Ellipse" WidthRequest="42" HeightRequest="42">
-              <Label Text="&#xF028;" FontFamily="FAS" FontSize="18" TextColor="{StaticResource TextPrimary}"
-                     HorizontalOptions="Center" VerticalOptions="Center"/>
-              <Border.GestureRecognizers>
-                <TapGestureRecognizer Tapped="OnSpeakTapped"/>
-              </Border.GestureRecognizers>
-            </Border>
-          </Grid>
-        </Grid>
+  <VerticalStackLayout Spacing="0">
+    <!-- Fixed Exit Button Header -->
+    <Grid Padding="16,40,16,10" BackgroundColor="Transparent">
+      <Border WidthRequest="50" HeightRequest="50"
+              BackgroundColor="{StaticResource Surface}" StrokeThickness="0"
+              StrokeShape="RoundRectangle 25" HorizontalOptions="End" VerticalOptions="Center"
+              ToolTipProperties.Text="Exit game"
+              SemanticProperties.Description="Exit button"
+              SemanticProperties.Hint="Ends the game for all players and returns to home page">
+        <Label Text="&#xF00D;" FontFamily="FontAwesome6FreeSolid" FontSize="20" TextColor="{StaticResource Ink}"
+               HorizontalOptions="Center" VerticalOptions="Center"
+               AutomationProperties.IsInAccessibleTree="False"/>
         <Border.GestureRecognizers>
-          <TapGestureRecognizer Tapped="OnFlip"/>
+          <TapGestureRecognizer Tapped="OnExitTapped"/>
         </Border.GestureRecognizers>
       </Border>
+    </Grid>
 
-      <!-- JUDGE BAR -->
-      <Border BackgroundColor="{StaticResource Surface}" StrokeThickness="0" StrokeShape="RoundRectangle 22" Padding="10">
-        <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto" ColumnSpacing="12" VerticalOptions="Center">
-          <!-- avatar + name of buzzer -->
-          <VerticalStackLayout Spacing="6" HorizontalOptions="Center" WidthRequest="78" IsVisible="{Binding HasBuzzWinner}">
-            <Border WidthRequest="56" HeightRequest="56"
-                    StrokeShape="Ellipse" StrokeThickness="0"
-                    BackgroundColor="#E8DFFB">
-              <Image Source="{Binding BuzzAvatar}" Aspect="AspectFill">
-                <Image.Clip>
-                  <EllipseGeometry Center="28,28" RadiusX="28" RadiusY="28"/>
-                </Image.Clip>
-              </Image>
-            </Border>
-            <Label Text="{Binding BuzzWinner}" FontSize="11"
-                   TextColor="{StaticResource TextSecondary}"
-                   HorizontalTextAlignment="Center"/>
-          </VerticalStackLayout>
+    <!-- Main Content -->
+    <ScrollView>
+    <!-- Responsive layout: vertical stack on phone, horizontal on desktop -->
+    <Grid Padding="16,10,16,28" HorizontalOptions="Center"
+          ColumnDefinitions="{OnIdiom Phone='*', Desktop='1.2*,0.8*'}"
+          RowDefinitions="{OnIdiom Phone='Auto,Auto,Auto,Auto', Desktop='Auto,Auto,Auto,*'}"
+          ColumnSpacing="20" RowSpacing="16">
 
-          <!-- instruction -->
-          <Label Grid.Column="1" Text="RANG THE BELL FIRST!"
-                 FontAttributes="Bold" FontSize="13"
-                 TextColor="{StaticResource TextPrimary}"
-                 VerticalOptions="Center"/>
+      <!-- FLASHCARD PANEL (Phone: row 0, Desktop: column 0) -->
+      <Grid Grid.Row="0" Grid.Column="0"
+            HorizontalOptions="{OnIdiom Phone=Center, Desktop=FillAndExpand}"
+            MaximumWidthRequest="{OnIdiom Phone=500, Desktop=600}">
+        <Border BackgroundColor="{StaticResource Surface}" StrokeThickness="0" StrokeShape="RoundRectangle 22"
+                HeightRequest="420" Margin="0,6,0,0" HorizontalOptions="FillAndExpand" Padding="14"
+                SemanticProperties.Description="Flashcard"
+                SemanticProperties.Hint="Tap to flip and reveal the answer">
+          <Grid RowDefinitions="Auto,*,Auto">
+            <!-- spacer for header area (pill overlays this) -->
+            <Grid Grid.Row="0" HeightRequest="12" />
+
+            <!-- center: question/answer text; tap to flip -->
+            <VerticalStackLayout Grid.Row="1" Spacing="8" HorizontalOptions="Center" VerticalOptions="Center">
+              <Label Text="Tap card to reveal the answer" FontSize="11" TextColor="{StaticResource TextSecondary}" HorizontalTextAlignment="Center"
+                     SemanticProperties.Description="Instruction" />
+              <Label Text="{Binding CurrentQuestion}" FontSize="20" TextColor="{StaticResource TextSecondary}" FontAttributes="Bold" HorizontalTextAlignment="Center"
+                     SemanticProperties.Description="Question text" />
+              <Label Text="{Binding CurrentAnswer}" FontSize="16" TextColor="{StaticResource TextSecondary}" HorizontalTextAlignment="Center"
+                     SemanticProperties.Description="Answer text" />
+            </VerticalStackLayout>
+
+            <!-- bottom controls: skip button (left) and audio icon (right) -->
+            <Grid Grid.Row="2" ColumnDefinitions="Auto,*,Auto" Padding="0,2,0,0" Margin="8,0,8,8">
+              <!-- skip button on the left -->
+              <Border Grid.Column="0" BackgroundColor="White" StrokeShape="Ellipse" WidthRequest="44" HeightRequest="44"
+                      ToolTipProperties.Text="Skip this question"
+                      SemanticProperties.Description="Skip button"
+                      SemanticProperties.Hint="Moves this question to the end of the deck">
+                <Label Text="&#xF105;" FontFamily="FontAwesome6FreeSolid" FontSize="16" TextColor="{StaticResource TextPrimary}"
+                       HorizontalOptions="Center" VerticalOptions="Center"
+                       AutomationProperties.IsInAccessibleTree="False" />
+                <Border.GestureRecognizers>
+                  <TapGestureRecognizer Tapped="OnSkip" />
+                </Border.GestureRecognizers>
+              </Border>
+              
+              <Grid Grid.Column="1"/>
+              
+              <!-- audio icon on the right -->
+              <Border Grid.Column="2" BackgroundColor="White" StrokeShape="Ellipse" WidthRequest="42" HeightRequest="42"
+                      ToolTipProperties.Text="Read question aloud"
+                      SemanticProperties.Description="Speak button"
+                      SemanticProperties.Hint="Reads the current question using text-to-speech">
+                <Label Text="&#xF028;" FontFamily="FontAwesome6FreeSolid" FontSize="18" TextColor="{StaticResource TextPrimary}"
+                       HorizontalOptions="Center" VerticalOptions="Center"
+                       AutomationProperties.IsInAccessibleTree="False"/>
+                <Border.GestureRecognizers>
+                  <TapGestureRecognizer Tapped="OnSpeakTapped"/>
+                </Border.GestureRecognizers>
+              </Border>
+            </Grid>
+          </Grid>
+          <Border.GestureRecognizers>
+            <TapGestureRecognizer Tapped="OnFlip"/>
+          </Border.GestureRecognizers>
+        </Border>
+
+        <!-- overlay pill placed as sibling so it won't be clipped by the card's rounded corners -->
+        <Border BackgroundColor="#0E6A85"
+                StrokeThickness="0"
+                StrokeShape="RoundRectangle 12"
+                Padding="18,8"
+                HeightRequest="40"
+                MinimumHeightRequest="40"
+                HorizontalOptions="Center"
+                VerticalOptions="Start"
+                Margin="0,-5,0,0"
+                WidthRequest="320"
+                SemanticProperties.Description="Deck title badge">
+          <Label Text="{Binding DeckTitle}" FontAttributes="Bold" FontSize="14" TextColor="White"
+                 HorizontalOptions="Center" VerticalOptions="Center" LineBreakMode="NoWrap"
+                 SemanticProperties.Description="Current deck name" />
+        </Border>
+
+      </Grid>
+      <!-- End of flashcard grid -->
+
+      <!-- JUDGE BAR (Phone: row 1, Desktop: row 1 col 0) - Compact design below card -->
+      <Border x:Name="JudgeBar" Grid.Row="1" Grid.Column="0"
+              BackgroundColor="{StaticResource Surface}" StrokeThickness="0" StrokeShape="RoundRectangle 18" Padding="12,10"
+              HorizontalOptions="{OnIdiom Phone=Center, Desktop=FillAndExpand}"
+              MaximumWidthRequest="{OnIdiom Phone=500, Desktop=600}"
+              IsVisible="{Binding HasBuzzWinner}"
+              SemanticProperties.Description="First player judge controls"
+              SemanticProperties.Hint="Shows the player who buzzed first and accept or reject buttons">
+        <Grid ColumnDefinitions="Auto,Auto,*,Auto,Auto" ColumnSpacing="10" VerticalOptions="Center">
+          <!-- avatar -->
+          <Border Grid.Column="0" WidthRequest="40" HeightRequest="40"
+                  StrokeShape="Ellipse" StrokeThickness="0"
+                  BackgroundColor="#E8DFFB"
+                  SemanticProperties.Description="Player avatar">
+            <Image Source="{Binding BuzzAvatar}" Aspect="AspectFill"
+                   AutomationProperties.IsInAccessibleTree="False">
+              <Image.Clip>
+                <EllipseGeometry Center="20,20" RadiusX="20" RadiusY="20"/>
+              </Image.Clip>
+            </Image>
+          </Border>
+          
+          <!-- name -->
+          <Label Grid.Column="1" Text="{Binding BuzzWinner}" FontSize="12" FontAttributes="Bold"
+                 TextColor="{StaticResource TextPrimary}" VerticalOptions="Center"
+                 SemanticProperties.Description="Player name"/>
+          
+          <!-- text -->
+          <Label Grid.Column="2" Text="rang the bell first!" FontSize="11"
+                 TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"
+                 SemanticProperties.Description="First player to buzz in" />
 
           <!-- accept -->
-          <Border Grid.Column="2" StrokeShape="Ellipse" WidthRequest="52" HeightRequest="52" BackgroundColor="{StaticResource OkGreen}">
-            <Label Text="&#xF00C;" FontFamily="FAS" FontSize="18" TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
+          <Border Grid.Column="3" StrokeShape="Ellipse" WidthRequest="44" HeightRequest="44" BackgroundColor="{StaticResource OkGreen}"
+                  ToolTipProperties.Text="Mark answer as correct"
+                  SemanticProperties.Description="Accept button"
+                  SemanticProperties.Hint="Awards a point to the player and moves to next question">
+            <Label Text="&#xF00C;" FontFamily="FontAwesome6FreeSolid" FontSize="16" TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"
+                   AutomationProperties.IsInAccessibleTree="False"/>
             <Border.GestureRecognizers>
               <TapGestureRecognizer Tapped="OnAccept"/>
             </Border.GestureRecognizers>
           </Border>
 
           <!-- reject -->
-          <Border Grid.Column="3" StrokeShape="Ellipse" WidthRequest="52" HeightRequest="52" BackgroundColor="{StaticResource DangerRed}">
-            <Label Text="&#xF00D;" FontFamily="FAS" FontSize="18" TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
+          <Border Grid.Column="4" StrokeShape="Ellipse" WidthRequest="44" HeightRequest="44" BackgroundColor="{StaticResource DangerRed}"
+                  ToolTipProperties.Text="Mark answer as incorrect"
+                  SemanticProperties.Description="Reject button"
+                  SemanticProperties.Hint="Reopens buzzing for other players to steal the question">
+            <Label Text="&#xF00D;" FontFamily="FontAwesome6FreeSolid" FontSize="16" TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"
+                   AutomationProperties.IsInAccessibleTree="False"/>
             <Border.GestureRecognizers>
               <TapGestureRecognizer Tapped="OnReject"/>
-            </Border.GestureRecognizers>
-          </Border>
-
-          <!-- next -->
-          <Border Grid.Column="4" StrokeShape="Ellipse" WidthRequest="52" HeightRequest="52" BackgroundColor="White">
-            <Label Text="&#xF105;" FontFamily="FAS" FontSize="18" TextColor="{StaticResource TextPrimary}" HorizontalOptions="Center" VerticalOptions="Center"/>
-            <Border.GestureRecognizers>
-              <TapGestureRecognizer Tapped="OnSkip"/>
             </Border.GestureRecognizers>
           </Border>
         </Grid>
       </Border>
 
-    </VerticalStackLayout>
-  </ScrollView>
+      <!-- SECOND JUDGE BAR (Phone: row 2, Desktop: row 2 col 0) - Compact design below first judge bar -->
+      <Border x:Name="JudgeBar2" Grid.Row="2" Grid.Column="0"
+              BackgroundColor="{StaticResource Surface}" StrokeThickness="0" StrokeShape="RoundRectangle 18" Padding="12,10"
+              HorizontalOptions="{OnIdiom Phone=Center, Desktop=FillAndExpand}"
+              MaximumWidthRequest="{OnIdiom Phone=500, Desktop=600}"
+              IsVisible="{Binding HasSecondBuzzWinner}"
+              SemanticProperties.Description="Second player judge controls"
+              SemanticProperties.Hint="Shows the player who buzzed second and accept or reject buttons">
+        <Grid ColumnDefinitions="Auto,Auto,*,Auto,Auto" ColumnSpacing="10" VerticalOptions="Center">
+          <!-- avatar -->
+          <Border Grid.Column="0" WidthRequest="40" HeightRequest="40"
+                  StrokeShape="Ellipse" StrokeThickness="0"
+                  BackgroundColor="#E8DFFB"
+                  SemanticProperties.Description="Player avatar">
+            <Image Source="{Binding SecondBuzzAvatar}" Aspect="AspectFill"
+                   AutomationProperties.IsInAccessibleTree="False">
+              <Image.Clip>
+                <EllipseGeometry Center="20,20" RadiusX="20" RadiusY="20"/>
+              </Image.Clip>
+            </Image>
+          </Border>
+          
+          <!-- name -->
+          <Label Grid.Column="1" Text="{Binding SecondBuzzWinner}" FontSize="12" FontAttributes="Bold"
+                 TextColor="{StaticResource TextPrimary}" VerticalOptions="Center"
+                 SemanticProperties.Description="Player name"/>
+          
+          <!-- text -->
+          <Label Grid.Column="2" Text="rang the bell next!" FontSize="11"
+                 TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"
+                 SemanticProperties.Description="Second player to buzz in" />
+
+          <!-- accept -->
+          <Border Grid.Column="3" StrokeShape="Ellipse" WidthRequest="44" HeightRequest="44" BackgroundColor="{StaticResource OkGreen}"
+                  ToolTipProperties.Text="Mark answer as correct"
+                  SemanticProperties.Description="Accept button"
+                  SemanticProperties.Hint="Awards a point to the player and moves to next question">
+            <Label Text="&#xF00C;" FontFamily="FontAwesome6FreeSolid" FontSize="16" TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"
+                   AutomationProperties.IsInAccessibleTree="False"/>
+            <Border.GestureRecognizers>
+              <TapGestureRecognizer Tapped="OnAccept2"/>
+            </Border.GestureRecognizers>
+          </Border>
+
+          <!-- reject -->
+          <Border Grid.Column="4" StrokeShape="Ellipse" WidthRequest="44" HeightRequest="44" BackgroundColor="{StaticResource DangerRed}"
+                  ToolTipProperties.Text="Mark answer as incorrect"
+                  SemanticProperties.Description="Reject button"
+                  SemanticProperties.Hint="Reopens buzzing for other players to steal the question">
+            <Label Text="&#xF00D;" FontFamily="FontAwesome6FreeSolid" FontSize="16" TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"
+                   AutomationProperties.IsInAccessibleTree="False"/>
+            <Border.GestureRecognizers>
+              <TapGestureRecognizer Tapped="OnReject2"/>
+            </Border.GestureRecognizers>
+          </Border>
+        </Grid>
+      </Border>
+
+      <!-- LEADERBOARD (Phone: row 3, Desktop: row 0 column 1) - Reuses PlayerBuzzPage design -->
+      <Border Grid.Row="{OnIdiom Phone=3, Desktop=0}" Grid.Column="{OnIdiom Phone=0, Desktop=1}"
+              Grid.RowSpan="{OnIdiom Phone=1, Desktop=4}"
+              BackgroundColor="{StaticResource Surface}" StrokeThickness="0" StrokeShape="RoundRectangle 22"
+              Padding="16" HorizontalOptions="{OnIdiom Phone=Center, Desktop=FillAndExpand}"
+              VerticalOptions="{OnIdiom Phone=Start, Desktop=FillAndExpand}"
+              MaximumWidthRequest="{OnIdiom Phone=500, Desktop=400}"
+              SemanticProperties.Description="Player leaderboard"
+              SemanticProperties.Hint="Shows current scores for all players">
+        <VerticalStackLayout Spacing="10">
+          <Label Text="LEADERBOARDS" FontAttributes="Bold" FontSize="13"
+                 HorizontalTextAlignment="Center" TextColor="{StaticResource TextPrimary}"
+                 SemanticProperties.HeadingLevel="Level2"
+                 SemanticProperties.Description="Leaderboard heading" />
+
+          <ScrollView HeightRequest="{OnIdiom Phone=320, Desktop=500}">
+            <CollectionView ItemsSource="{Binding Participants}" SelectionMode="None"
+                            SemanticProperties.Description="List of players and their scores">
+              <CollectionView.ItemTemplate>
+                <DataTemplate>
+                  <Grid ColumnDefinitions="Auto,Auto,*,Auto" Padding="4,10" ColumnSpacing="10">
+                    <!-- Rank -->
+                    <Label Text="{Binding Rank}" FontSize="18" VerticalOptions="Center" TextColor="{StaticResource TextPrimary}"
+                           SemanticProperties.Description="Player rank"/>
+
+                    <!-- Avatar with crown -->
+                    <Grid Grid.Column="1">
+                      <Border WidthRequest="42" HeightRequest="42" StrokeShape="Ellipse" StrokeThickness="0" BackgroundColor="#E8DFFB"
+                              SemanticProperties.Description="Player avatar">
+                        <Image Source="{Binding Avatar}" Aspect="AspectFill"
+                               AutomationProperties.IsInAccessibleTree="False">
+                          <Image.Clip>
+                            <EllipseGeometry Center="21,21" RadiusX="21" RadiusY="21"/>
+                          </Image.Clip>
+                        </Image>
+                      </Border>
+                      <!-- tiny crown for rank 1 -->
+                      <Label IsVisible="{Binding IsLeader}"
+                             Text="&#xF521;" FontFamily="FontAwesome6FreeSolid" FontSize="16" TextColor="#F1C40F"
+                             TranslationX="-6" TranslationY="-6"
+                             AutomationProperties.IsInAccessibleTree="False"/>
+                    </Grid>
+
+                    <!-- Name -->
+                    <Label Grid.Column="2" Text="{Binding Name}" FontSize="12"
+                           TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"
+                           SemanticProperties.Description="Player name"/>
+
+                    <!-- Score pill -->
+                    <Border Grid.Column="3" BackgroundColor="#0E6A85" StrokeThickness="0"
+                            StrokeShape="RoundRectangle 12" Padding="10,4" VerticalOptions="Center">
+                      <Label Text="{Binding PointsText}" FontSize="11" TextColor="White"
+                             SemanticProperties.Description="Player score"/>
+                    </Border>
+                  </Grid>
+                </DataTemplate>
+              </CollectionView.ItemTemplate>
+            </CollectionView>
+          </ScrollView>
+        </VerticalStackLayout>
+      </Border>
+
+    </Grid>
+    </ScrollView>
+  </VerticalStackLayout>
 </ContentPage>

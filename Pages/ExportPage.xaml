@@ -75,7 +75,9 @@
            Margin="8,0,0,0"
            FontAttributes="Bold" FontSize="18"
            TextColor="{StaticResource TextPrimary}"
-           VerticalOptions="Center" />
+           VerticalOptions="Center"
+           SemanticProperties.HeadingLevel="Level1"
+           SemanticProperties.Description="Export reviewer page heading" />
 
 
   </Grid>
@@ -92,13 +94,15 @@
             <!-- Logo circle -->
             <Border BackgroundColor="#F3F6FF" StrokeThickness="0" StrokeShape="Ellipse"
                     WidthRequest="64" HeightRequest="64" HorizontalOptions="Center">
-              <Label Text="&#xF0E7;" FontFamily="FAS" FontSize="24"
+              <Label Text="&#xF0E7;" FontFamily="FontAwesome6FreeSolid" FontSize="24"
                      HorizontalOptions="Center" VerticalOptions="Center"
                      TextColor="{StaticResource PrimaryDark}" />
             </Border>
 
             <Label Text="EXPORT REVIEWER" FontAttributes="Bold" FontSize="16"
-                   TextColor="{StaticResource TextPrimary}" HorizontalTextAlignment="Center"/>
+                   TextColor="{StaticResource TextPrimary}" HorizontalTextAlignment="Center"
+                   SemanticProperties.HeadingLevel="Level2"
+                   SemanticProperties.Description="Export reviewer section" />
 
             <Label Text="Click below to export your reviewer in TXT format."
                    FontSize="13" TextColor="{StaticResource TextPrimary}" HorizontalTextAlignment="Center"/>
@@ -118,9 +122,11 @@
         <Border Style="{StaticResource CardStyle}">
           <VerticalStackLayout Spacing="12">
             <!-- Header strip -->
-            <Border BackgroundColor="{StaticResource Ink}" StrokeThickness="0"
-                    StrokeShape="RoundRectangle 12" Padding="12,8" Margin="0,-6,0,0">
-              <Label Text="{Binding ReviewerTitle}" TextColor="White" FontAttributes="Bold"/>
+            <Border BackgroundColor="#0E6A85" StrokeThickness="0"
+                    StrokeShape="RoundRectangle 12" Padding="20,8" Margin="0,0,0,0"
+                    HorizontalOptions="Start">
+              <Label Text="{Binding ReviewerTitle}" TextColor="White" FontAttributes="Bold"
+                     LineBreakMode="WordWrap" MaxLines="2"/>
             </Border>
 
             <Grid ColumnDefinitions="Auto,*" Padding="6,0,6,0">
@@ -130,7 +136,9 @@
             </Grid>
 
             <!-- Simple preview list of Q/A -->
-            <CollectionView ItemsSource="{Binding Cards}" SelectionMode="None" HeightRequest="320">
+            <CollectionView ItemsSource="{Binding Cards}" SelectionMode="None" HeightRequest="320"
+                            SemanticProperties.Description="Flashcard preview list"
+                            SemanticProperties.Hint="Preview of flashcards to be exported">
               <CollectionView.ItemTemplate>
                 <DataTemplate>
                   <Border StrokeThickness="0" BackgroundColor="#F7FAFC" StrokeShape="RoundRectangle 12" Padding="12" Margin="0,4,0,0">
@@ -144,7 +152,10 @@
               </CollectionView.ItemTemplate>
             </CollectionView>
 
-            <Border Style="{StaticResource PrimaryPill}">
+            <Border Style="{StaticResource PrimaryPill}"
+                    ToolTipProperties.Text="Export reviewer deck to file"
+                    SemanticProperties.Description="Export button"
+                    SemanticProperties.Hint="Exports the reviewer deck to a text file for sharing">
               <Label Text="EXPORT" TextColor="White" FontAttributes="Bold"
                      HorizontalOptions="Center" />
               <Border.GestureRecognizers>

@@ -5,11 +5,26 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Maui.Storage;
+using mindvault.Core.Logging;
+using mindvault.Services;
 
 namespace mindvault.Srs
 {
+    // We want to refactor the existing SrsEngine to use a "dual-mode" scheduler: DEFAULT mode and CRAM mode.
+    // DEFAULT mode: uses a 30-minute "due-soon window," batch up to 10 cards; when fewer than 10 due, fill with new cards (unlimited).
+    // On wrong answer in DEFAULT mode: reschedule the card soon (e.g. +5 minutes).
+    // On correct answer in DEFAULT mode: schedule next review with spaced intervals (e.g. 1 day ? 3 days ? 7 days ? 14 days ? �).
+    //
+    // CRAM mode: uses a 10-minute "due-soon window," batch up to 5 cards; when fewer than 5 due, fill with new cards (unlimited).
+    // On wrong answer in CRAM mode: reschedule soon (e.g. +1 minute).
+    // On correct answer in CRAM mode: schedule next review after a short cooldown (e.g. 30�60 minutes).
+    //
+    // Replace RefreshActiveSet and scheduling logic accordingly, and ensure PickNextCard picks from new active set sorted by DueAt.
+    // Remove or ignore old NEW_CARD_LIMIT_DEFAULT / INTRODUCE_PER_REFRESH caps � new-card introduction is unlimited (as long as batch slots exist).
+
     /// <summary>
-    /// Core spaced repetition engine (deck-independent logic)
+    /// Spaced repetition engine with deterministic SM-2 scheduling and a fast cram mode.
+    /// Card order is strictly by DueAt; no randomness or jitter is used.
     /// </summary>
     public class SrsEngine
     {
@@ -18,50 +33,28 @@ namespace mindvault.Srs
         private readonly Queue<SrsCard> _recentlyShown = new();
         private readonly HashSet<SrsCard> _learnedEver = new();
         private const int RECENT_BUFFER_SIZE = 5;
-        private const int DEFAULT_BATCH_SIZE = 10;
-        private int _batchSize = DEFAULT_BATCH_SIZE;
-        private List<SrsCard> _activeBatch = new();
-        private int _batchIndex = 0; // starts at 0 before first activation
+
+        private const int ACTIVE_LIMIT_DEFAULT = 10;
+        private const int ACTIVE_LIMIT_CRAM = 8; // softened increase; will cap to 5 via window batch
+        private const int DEFAULT_BATCH_LIMIT = 5; // reduced default batch size from 10 to 5
+        private const int CRAM_BATCH_LIMIT = 5;
+        private static readonly TimeSpan DEFAULT_DUE_WINDOW = TimeSpan.FromMinutes(30);
+        private static readonly TimeSpan CRAM_DUE_WINDOW = TimeSpan.FromMinutes(5); // lowered limiter to 5 minutes
+
+        private List<SrsCard> _activeSet = new();
         private bool _cramMode = false;
-        private CramModeOptions? _cramOptions;
+        private int _newIntroducedThisSession = 0; // ignored for quota, kept for telemetry if needed
 
-        private void ActivateNextBatch()
-        {
-            if (_cramMode)
-            {
-                _activeBatch.Clear();
-                var now = DateTime.UtcNow;
-                var cramBatch = _cards.Where(c => c.Stage == Stage.Seen && c.DueAt <= now)
-                                       .Take(_batchSize)
-                                       .ToList();
-                _activeBatch.AddRange(cramBatch);
+        private readonly ICoreLogger _logger;
+        private readonly DatabaseService? _db;
 
-                if (_activeBatch.Count < _batchSize)
-                {
-                    var additional = _cards.Where(c => c.Stage == Stage.Avail)
-                                            .Take(_batchSize - _activeBatch.Count)
-                                            .ToList();
-                    _activeBatch.AddRange(additional);
-                }
+        private const double MinEase = 1.3;
+        private const double MaxEase = 3.0;
+        private const int FailThresholdQuality = 3;
+        private const double CRAM_GROWTH_RATIO = 2.0; // multiplicative growth for cram mode intervals
 
-                if (_activeBatch.Any())
-                    _batchIndex++;
-                _recentlyShown.Clear();
-                return;
-            }
-            var nextBatch = _cards.Where(c => c.Stage == Stage.Avail).Take(_batchSize).ToList();
-            if (nextBatch.Any())
-            {
-                _batchIndex++;
-                _activeBatch = nextBatch;
-                _recentlyShown.Clear();
-            }
-            else
-            {
-                _activeBatch.Clear();
-            }
-        }
-
+        private int _saveCounter = 0;
+        private DateTime _lastSaveTime = DateTime.UtcNow;
         private const string PrefReviewStatePrefix = "ReviewState_";
 
         public SrsCard? CurrentCard { get; private set; }
@@ -70,267 +63,225 @@ namespace mindvault.Srs
         public int WrongCount { get; private set; }
         public bool SessionComplete { get; private set; }
 
-        // scheduling params
-        private readonly double MinEase = 1.3;
-        private readonly double MaxEase = 3.0;
-        private readonly double AgainEasePenalty = 0.2;
-        private int _saveCounter = 0;
-        private DateTime _lastSaveTime = DateTime.UtcNow;
-
         public int Total => _cards.Count;
         public int Seen => _cards.Count(c => c.SeenCount > 0);
         public int Learned => _learnedEver.Count;
         public int Skilled => _cards.Count(c => c.CountedSkilled);
         public int Memorized => _cards.Count(c => c.CountedMemorized);
-        public int BatchIndex => _batchIndex;
-        public int BatchSize => _batchSize;
-        public int RemainingAvail => _cards.Count(c => c.Stage == Stage.Avail);
+        public int ActiveCount => _activeSet.Count;
 
         public event Action? StateChanged;
+
+        private void RefreshActiveSet()
+        {
+            var now = DateTime.UtcNow;
+            var window = _cramMode ? CRAM_DUE_WINDOW : DEFAULT_DUE_WINDOW;
+            int batchLimit = _cramMode ? CRAM_BATCH_LIMIT : DEFAULT_BATCH_LIMIT;
+
+            // 1) Due-soon cards (non-Avail) within window
+            var dueSoon = _cards
+                .Where(c => c.Stage != Stage.Avail && c.DueAt <= now + window)
+                .OrderBy(c => c.DueAt)
+                .Take(batchLimit)
+                .ToList();
+
+            var batch = new List<SrsCard>(dueSoon);
+            int slots = batchLimit - batch.Count;
+
+            // 2) Fill remaining slots with new cards (unlimited intro)
+            if (slots > 0)
+            {
+                var newCards = _cards
+                    .Where(c => c.Stage == Stage.Avail)
+                    .OrderBy(c => c.Id)
+                    .Take(slots)
+                    .ToList();
+                foreach (var c in newCards)
+                {
+                    c.Stage = Stage.Seen;
+                    c.Repetitions = 0;
+                    c.Interval = TimeSpan.Zero;
+                    c.DueAt = now;
+                    c.CooldownUntil = now;
+                    batch.Add(c);
+                    _newIntroducedThisSession++;
+                }
+            }
+
+            // 3) Fallback: If batch is still empty AND there are no new cards available,
+            // get the earliest due card from non-Avail cards (even if not due yet)
+            if (batch.Count == 0 && !_cards.Any(c => c.Stage == Stage.Avail))
+            {
+                var earliestDueCard = _cards
+                    .Where(c => c.Stage != Stage.Avail) // Only consider cards that have been seen
+                    .OrderBy(c => c.DueAt) // Get the earliest due card regardless of due time
+                    .FirstOrDefault();
+
+                if (earliestDueCard != null)
+                {
+                    batch.Add(earliestDueCard);
+                }
+            }
+
+            _activeSet = batch.OrderBy(c => c.DueAt).ToList();
+        }
 
         public async Task LoadCardsAsync(int reviewerId, Func<int, Task<IEnumerable<SrsCard>>> fetchFunc)
         {
             await _lock.WaitAsync();
             try
             {
-                _cramMode = false;
-                _batchSize = DEFAULT_BATCH_SIZE; // ensure default batch size restored
-                ReviewerId = reviewerId;
-                _cards.Clear();
-                _learnedEver.Clear();
-                CorrectCount = 0;
-                WrongCount = 0;
-                _recentlyShown.Clear();
-                _activeBatch.Clear();
-
+                _cramMode = false; ReviewerId = reviewerId; _newIntroducedThisSession = 0;
+                _cards.Clear(); _learnedEver.Clear(); CorrectCount = 0; WrongCount = 0; _recentlyShown.Clear(); _activeSet.Clear(); CurrentCard = null;
                 var loaded = await fetchFunc(reviewerId);
                 _cards.AddRange(loaded);
                 RestoreProgress();
-
-                ActivateNextBatch();
+                RefreshActiveSet();
+                _logger.Info($"Loaded {Total} cards (default mode)", "srs");
             }
-            finally
-            {
-                _lock.Release();
-            }
+            catch (Exception ex) { _logger.Error("LoadCardsAsync failed", ex, "srs"); }
+            finally { _lock.Release(); }
         }
 
-        public async Task LoadCardsForCramModeAsync(int reviewerId, Func<int, Task<IEnumerable<SrsCard>>> fetchFunc, CramModeOptions? options = null)
+        public async Task LoadCardsForCramModeAsync(int reviewerId, Func<int, Task<IEnumerable<SrsCard>>> fetchFunc)
         {
             await _lock.WaitAsync();
             try
             {
-                _cramMode = true;
-                _cramOptions = options ?? CramModeOptions.Default;
-                _batchSize = 5; // cram mode batch size override
-                ReviewerId = reviewerId;
-
-                _cards.Clear();
-                _recentlyShown.Clear();
-                _activeBatch.Clear();
-
+                _cramMode = true; ReviewerId = reviewerId; _newIntroducedThisSession = 0;
+                _cards.Clear(); _learnedEver.Clear(); CorrectCount = 0; WrongCount = 0; _recentlyShown.Clear(); _activeSet.Clear(); CurrentCard = null;
                 var loaded = await fetchFunc(reviewerId);
                 _cards.AddRange(loaded);
-
-                // Detect whether previous progress exists; if not, treat as fresh (reset learned/skilled/memorized stats)
-                var payload = Preferences.Get(PrefReviewStatePrefix + reviewerId, null);
-                _learnedEver.Clear();
-                CorrectCount = 0;
-                WrongCount = 0;
-                if (!string.IsNullOrWhiteSpace(payload))
-                {
-                    RestoreProgress(); // rehydrate sets if there was saved progress
-                }
-
-                var now = DateTime.UtcNow;
-                foreach (var card in _cards)
-                {
-                    if (payload == null || card.Stage == Stage.Avail) // fresh cards or after reset
-                        card.Stage = Stage.Seen;
-                    card.DueAt = now;
-                    card.Interval = _cramOptions.InitialInterval;
-                    card.CooldownUntil = now;
-                }
-
-                ActivateNextBatch();
+                RestoreProgress();
+                RefreshActiveSet();
+                _logger.Info($"Loaded {Total} cards (cram mode)", "srs");
             }
-            finally
-            {
-                _lock.Release();
-            }
+            catch (Exception ex) { _logger.Error("LoadCardsForCramModeAsync failed", ex, "srs"); }
+            finally { _lock.Release(); }
         }
 
-        private void ApplyCooldown(SrsCard card, bool success)
+        // Overload to satisfy existing call sites with CramModeOptions
+        public Task LoadCardsForCramModeAsync(int reviewerId, Func<int, Task<IEnumerable<SrsCard>>> fetchFunc, CramModeOptions _)
+            => LoadCardsForCramModeAsync(reviewerId, fetchFunc);
+
+        private void ScheduleAfterAnswer(SrsCard card, bool success)
         {
             var now = DateTime.UtcNow;
-            if (_cramMode && _cramOptions != null)
+            if (_cramMode)
             {
-                card.CooldownUntil = now + TimeSpan.FromSeconds(success ? _cramOptions.CorrectCooldownSeconds : _cramOptions.FailCooldownSeconds);
+                if (!success)
+                {
+                    // wrong ? retry soon (1 min) and reset progression; add short cooldown to prevent instant repeat
+                    card.Repetitions = 0;
+                    card.Interval = TimeSpan.FromMinutes(1);
+                    card.DueAt = now + card.Interval;
+                    card.CooldownUntil = now + TimeSpan.FromSeconds(10);
+                }
+                else
+                {
+                    card.Repetitions++;
+                    if (card.Repetitions == 1)
+                    {
+                        // start at 3 minutes
+                        card.Interval = TimeSpan.FromMinutes(3);
+                    }
+                    else
+                    {
+                        var baseSeconds = card.Interval.TotalSeconds <= 0 ? TimeSpan.FromMinutes(3).TotalSeconds : card.Interval.TotalSeconds;
+                        card.Interval = TimeSpan.FromSeconds(baseSeconds * CRAM_GROWTH_RATIO);
+                    }
+                    card.DueAt = now + card.Interval;
+                    card.CooldownUntil = now + TimeSpan.FromSeconds(5);
+                }
             }
             else
             {
-                card.CooldownUntil = now + TimeSpan.FromSeconds(success ? 3 : 10);
+                if (!success)
+                {
+                    // wrong ? small delay (5 min) and cooldown to avoid immediate repeat
+                    card.Repetitions = 0;
+                    card.Interval = TimeSpan.FromMinutes(5);
+                    card.DueAt = now + card.Interval;
+                    card.CooldownUntil = now + TimeSpan.FromSeconds(10);
+                }
+                else
+                {
+                    card.Repetitions++;
+                    TimeSpan next;
+                    switch (card.Repetitions)
+                    {
+                        case 1: next = TimeSpan.FromDays(1); break;
+                        case 2: next = TimeSpan.FromDays(3); break;
+                        case 3: next = TimeSpan.FromDays(7); break;
+                        case 4: next = TimeSpan.FromDays(14); break;
+                        default: next = TimeSpan.FromDays(30); break;
+                    }
+                    card.Interval = next;
+                    card.DueAt = now + next;
+                    card.CooldownUntil = now + TimeSpan.FromSeconds(5);
+                }
             }
-            card.DueAt = now + card.Interval;
         }
 
         private void SaveProgressThrottled()
         {
             if (_saveCounter % 5 == 0 || (DateTime.UtcNow - _lastSaveTime).TotalSeconds > 15)
-            {
-                SaveProgress();
-                _lastSaveTime = DateTime.UtcNow;
-            }
+            { SaveProgress(); _lastSaveTime = DateTime.UtcNow; }
         }
 
-        public async Task GradeCardAsync(bool success)
+        public async Task GradeCardAsync(bool success) => await GradeCardWithQualityAsync(success ? 5 : 2);
+        public async Task GradeCardForCramModeAsync(bool success) { if (!_cramMode) { await GradeCardAsync(success); return; } await GradeCardAsync(success); }
+
+        private void AdvanceStageOnSuccess(SrsCard card)
+        {
+            // Keep existing stage progression semantics
+            if (card.Stage == Stage.Seen)
+            {
+                if (!card.CorrectOnce) card.CorrectOnce = true;
+                else { card.CorrectOnce = false; card.Stage = Stage.Learned; _learnedEver.Add(card); }
+            }
+            else if (card.Stage == Stage.Learned) { card.Stage = Stage.Skilled; card.CountedSkilled = true; }
+            else if (card.Stage == Stage.Skilled) { card.Stage = Stage.Memorized; card.CountedMemorized = true; }
+        }
+
+        private async Task GradeCardWithQualityAsync(int quality)
         {
             await _lock.WaitAsync();
             try
             {
                 if (CurrentCard == null) return;
                 var card = CurrentCard;
-                var now = DateTime.UtcNow;
+                bool success = quality >= FailThresholdQuality;
 
+                // Ease adjustments kept minimal
                 if (success)
                 {
-                    CorrectCount++;
-                    card.ConsecutiveCorrects++;
-                    card.Ease = Math.Clamp(card.Ease + 0.1, MinEase, MaxEase); // capped growth
-
-                    if (card.Interval == TimeSpan.Zero)
-                        card.Interval = TimeSpan.FromMinutes(1);
-                    else
-                        card.Interval = TimeSpan.FromDays(Math.Max(1, card.Interval.TotalDays * card.Ease));
-
-                    card.Interval *= (Random.Shared.NextDouble() * 0.2 + 0.9);
-
-                    if (card.Stage == Stage.Seen)
-                    {
-                        if (!card.CorrectOnce)
-                            card.CorrectOnce = true;
-                        else
-                        {
-                            card.Stage = Stage.Learned;
-                            _learnedEver.Add(card);
-                            card.CorrectOnce = false;
-                        }
-                    }
-                    else if (card.Stage == Stage.Learned)
-                    {
-                        card.Stage = Stage.Skilled;
-                        card.CountedSkilled = true;
-                    }
-                    else if (card.Stage == Stage.Skilled)
-                    {
-                        card.Stage = Stage.Memorized;
-                        card.CountedMemorized = true;
-                    }
-
-                    if (_activeBatch.Count > 0 && _activeBatch.All(b => b.Stage >= Stage.Learned))
-                    {
-                        ActivateNextBatch();
-                    }
+                    card.Ease = Math.Clamp(card.Ease + (_cramMode ? 0.05 : 0.1), MinEase, MaxEase);
+                    AdvanceStageOnSuccess(card);
                 }
                 else
                 {
-                    WrongCount++;
-                    card.ConsecutiveCorrects = 0;
-                    card.CorrectOnce = false;
-                    bool wasAdvanced = card.Stage > Stage.Seen;
-                    if (wasAdvanced)
+                    card.Ease = Math.Max(MinEase, card.Ease - (_cramMode ? 0.1 : 0.2));
+                    // On wrong from learned+, demote to Seen and clear counters
+                    bool wasLearnedOrAbove = card.Stage >= Stage.Learned;
+                    if (card.Stage != Stage.Avail)
+                    {
+                        card.CorrectOnce = false; card.CountedSkilled = false; card.CountedMemorized = false;
+                        if (wasLearnedOrAbove) card.Stage = Stage.Seen;
+                    }
+                    // Ensure Learned counter updates immediately
+                    if (wasLearnedOrAbove)
                     {
                         _learnedEver.Remove(card);
-                        card.CountedSkilled = false;
-                        card.CountedMemorized = false;
                     }
-                    card.Ease = Math.Clamp(card.Ease - AgainEasePenalty, MinEase, MaxEase); // bounded decay
-                    card.Interval = TimeSpan.FromMinutes(1);
-                    card.Stage = Stage.Seen;
                 }
 
-                // Single cooldown application
-                ApplyCooldown(card, success);
-                _saveCounter++;
-                SaveProgressThrottled();
+                ScheduleAfterAnswer(card, success);
+                _saveCounter++; SaveProgressThrottled();
+                RefreshActiveSet();
             }
-            finally
-            {
-                _lock.Release();
-                StateChanged?.Invoke();
-            }
-        }
-
-        public async Task GradeCardForCramModeAsync(bool success)
-        {
-            await _lock.WaitAsync();
-            try
-            {
-                if (!_cramMode) { await GradeCardAsync(success); return; }
-                if (CurrentCard == null) return;
-                var card = CurrentCard;
-                var opts = _cramOptions ?? CramModeOptions.Default;
-
-                if (success)
-                {
-                    CorrectCount++;
-                    card.ConsecutiveCorrects++;
-                    card.Ease = Math.Clamp(card.Ease + opts.EaseIncrement, MinEase, MaxEase);
-
-                    if (card.Interval == TimeSpan.Zero)
-                        card.Interval = opts.InitialInterval == TimeSpan.Zero ? TimeSpan.FromMinutes(1) : opts.InitialInterval;
-
-                    // Growth multiplier allows faster or slower expansion
-                    card.Interval = TimeSpan.FromMilliseconds(card.Interval.TotalMilliseconds * opts.IntervalGrowthMultiplier);
-
-                    // Randomization window
-                    var randFactor = opts.IntervalRandomLow + Random.Shared.NextDouble() * (opts.IntervalRandomHigh - opts.IntervalRandomLow);
-                    card.Interval = TimeSpan.FromMilliseconds(card.Interval.TotalMilliseconds * randFactor);
-
-                    if (card.Stage == Stage.Seen)
-                    {
-                        card.Stage = Stage.Learned;
-                        _learnedEver.Add(card);
-                    }
-                    else if (card.Stage == Stage.Learned)
-                    {
-                        card.Stage = Stage.Skilled;
-                        card.CountedSkilled = true;
-                    }
-                    else if (card.Stage == Stage.Skilled)
-                    {
-                        card.Stage = Stage.Memorized;
-                        card.CountedMemorized = true;
-                    }
-
-                    if (_activeBatch.Count > 0 && _activeBatch.All(b => b.Stage >= Stage.Learned))
-                        ActivateNextBatch();
-                }
-                else
-                {
-                    WrongCount++;
-                    card.ConsecutiveCorrects = 0;
-                    card.Ease = Math.Max(MinEase, card.Ease - AgainEasePenalty);
-                    card.Interval = opts.OnFailInterval; // configurable reset interval
-                    bool wasAdvanced = card.Stage > Stage.Seen;
-                    if (wasAdvanced)
-                    {
-                        _learnedEver.Remove(card);
-                        card.CountedSkilled = false;
-                        card.CountedMemorized = false;
-                    }
-                    card.Stage = Stage.Seen;
-                }
-
-                ApplyCooldown(card, success);
-                _saveCounter++;
-                SaveProgressThrottled();
-            }
-            finally
-            {
-                _lock.Release();
-                StateChanged?.Invoke();
-            }
+            catch (Exception ex) { _logger.Warn("GradeCardAsync error: " + ex.Message, "srs"); }
+            finally { _lock.Release(); StateChanged?.Invoke(); }
         }
 
         public async Task SkipCardAsync()
@@ -339,20 +290,16 @@ namespace mindvault.Srs
             try
             {
                 if (CurrentCard != null)
-                    CurrentCard.DueAt = DateTime.UtcNow.AddMinutes(2);
+                {
+                    var now = DateTime.UtcNow;
+                    CurrentCard.DueAt = now + (_cramMode ? TimeSpan.FromMinutes(2) : TimeSpan.FromMinutes(5));
+                }
             }
-            finally
-            {
-                _lock.Release();
-                PickNextCard();
-            }
+            catch (Exception ex) { _logger.Warn("SkipCard error: " + ex.Message, "srs"); }
+            finally { _lock.Release(); RefreshActiveSet(); PickNextCard(); }
         }
 
-        private bool ShouldMarkSessionComplete()
-        {
-            // Cram mode session completion only when all cards memorized
-            return _cramMode && _cards.All(c => c.Stage == Stage.Memorized);
-        }
+        private bool ShouldMarkSessionComplete() => _cards.Count > 0 && _cards.All(c => c.Stage >= Stage.Learned);
 
         public void PickNextCard()
         {
@@ -360,100 +307,64 @@ namespace mindvault.Srs
             try
             {
                 var now = DateTime.UtcNow;
-                IEnumerable<SrsCard> candidatePool = _activeBatch.Count > 0 ? _activeBatch : _cards;
-                var due = candidatePool
-                    .Where(c => c.Stage != Stage.Avail && c.DueAt <= now && c.CooldownUntil <= now && !_recentlyShown.Contains(c))
-                    .OrderBy(c => c.DueAt)
-                    .ToList();
-                var next = due.FirstOrDefault(c => !ReferenceEquals(c, CurrentCard))
-                        ?? due.FirstOrDefault();
+                if (_activeSet.Count == 0) RefreshActiveSet();
+
+                // Pick first eligible by due time and cooldown, avoid immediate repeats
+                SrsCard? next = _activeSet.FirstOrDefault(c => c.CooldownUntil <= now && !_recentlyShown.Contains(c));
                 if (next == null)
                 {
-                    var availInBatch = candidatePool.FirstOrDefault(c => c.Stage == Stage.Avail);
-                    if (availInBatch != null)
-                    {
-                        availInBatch.Stage = Stage.Seen;
-                        availInBatch.DueAt = now;
-                        next = availInBatch;
-                    }
-                    else
-                    {
-                        if (_activeBatch.Count > 0 && _activeBatch.All(b => b.Stage >= Stage.Learned))
-                        {
-                            ActivateNextBatch();
-                            candidatePool = _activeBatch.Count > 0 ? _activeBatch : _cards;
-                        }
-                        due = candidatePool
-                            .Where(c => c.Stage != Stage.Avail && c.CooldownUntil <= now && !_recentlyShown.Contains(c))
-                            .OrderBy(c => c.DueAt)
-                            .ToList();
-                        next = due.FirstOrDefault(c => !ReferenceEquals(c, CurrentCard))
-                               ?? due.FirstOrDefault();
-                        if (next == null)
-                        {
-                            var future = candidatePool
-                                .Where(c => c.Stage != Stage.Avail && c.CooldownUntil <= now)
-                                .OrderBy(c => c.DueAt)
-                                .FirstOrDefault();
-                            if (future != null)
-                            {
-                                if (future.DueAt > now) future.DueAt = now;
-                                next = future;
-                            }
-                            else
-                            {
-                                var cooldown = candidatePool
-                                    .Where(c => c.Stage != Stage.Avail)
-                                    .OrderBy(c => c.CooldownUntil)
-                                    .FirstOrDefault();
-                                if (cooldown != null)
-                                {
-                                    cooldown.CooldownUntil = now;
-                                    cooldown.DueAt = now;
-                                    next = cooldown;
-                                }
-                            }
-                        }
-                    }
+                    next = _activeSet.FirstOrDefault(c => c.CooldownUntil <= now) ?? null;
                 }
                 if (next == null)
                 {
-                    SessionComplete = ShouldMarkSessionComplete();
-                    return;
+                    // If still none, try to introduce a single new card and pick it
+                    var avail = _cards.FirstOrDefault(c => c.Stage == Stage.Avail);
+                    if (avail != null)
+                    {
+                        avail.Stage = Stage.Seen; avail.Repetitions = 0; avail.Interval = TimeSpan.Zero; avail.DueAt = now; avail.CooldownUntil = now;
+                        next = avail; RefreshActiveSet();
+                        _newIntroducedThisSession++;
+                    }
                 }
+
+                // As a final fallback: pick earliest non-new card that is not on cooldown
+                if (next == null && _cards.Count > 0)
+                {
+                    next = _cards
+                        .Where(c => c.Stage != Stage.Avail && c.CooldownUntil <= now)
+                        .OrderBy(c => c.DueAt)
+                        .FirstOrDefault();
+                    if (next == null)
+                    {
+                        // Try any card that is not on cooldown
+                        next = _cards.Where(c => c.CooldownUntil <= now).OrderBy(c => c.DueAt).FirstOrDefault();
+                    }
+                }
+
+                if (next == null) { CurrentCard = null; SessionComplete = ShouldMarkSessionComplete(); return; }
                 CurrentCard = next;
                 _recentlyShown.Enqueue(next);
                 if (_recentlyShown.Count > RECENT_BUFFER_SIZE) _recentlyShown.Dequeue();
                 CurrentCard.SeenCount++;
+                SessionComplete = ShouldMarkSessionComplete();
             }
-            finally
-            {
-                _lock.Release();
-                StateChanged?.Invoke();
-            }
+            catch (Exception ex) { _logger.Warn("PickNextCard error: " + ex.Message, "srs"); }
+            finally { _lock.Release(); StateChanged?.Invoke(); }
         }
 
-        public void NextBatch()
+        // Build a stable persistence key for the current deck that doesn't change on rename.
+        // Uses a deterministic string of sorted card IDs when available; falls back to ReviewerId.
+        private string GetReviewStateKey()
         {
-            _lock.Wait();
-            try
-            {
-                ActivateNextBatch();
-                if (!_cramMode)
-                    SessionComplete = false;
-                CurrentCard = null; // force fresh pick
-            }
-            finally
-            {
-                _lock.Release();
-            }
-            PickNextCard();
+            // Tie progress strictly to the reviewer id so adds/deletes/renames don't reset state
+            return PrefReviewStatePrefix + ReviewerId;
         }
 
         public void SaveProgress()
         {
             try
             {
+                if (_cards == null || _cards.Count == 0) return;
                 var payload = _cards.Select(c => new
                 {
                     c.Id,
@@ -465,29 +376,43 @@ namespace mindvault.Srs
                     c.ConsecutiveCorrects,
                     c.CountedSkilled,
                     c.CountedMemorized,
-                    c.SeenCount
+                    c.SeenCount,
+                    c.Repetitions
                 }).ToList();
+                Preferences.Set(GetReviewStateKey(), JsonSerializer.Serialize(payload));
 
-                Preferences.Set(PrefReviewStatePrefix + ReviewerId, JsonSerializer.Serialize(payload));
+                // Update database Learned field for cards that have reached Learned stage
+                if (_db != null && ReviewerId > 0)
+                {
+                    Task.Run(async () =>
+                    {
+                        try
+                        {
+                            foreach (var card in _cards.Where(c => c.Stage >= Stage.Learned))
+                            {
+                                await _db.UpdateFlashcardLearnedAsync(card.Id, true);
+                            }
+                        }
+                        catch { }
+                    });
+                }
             }
-            catch { }
+            catch (Exception ex) { _logger.Warn("SaveProgress error: " + ex.Message, "srs"); }
         }
 
         private void RestoreProgress()
         {
             try
             {
-                var payload = Preferences.Get(PrefReviewStatePrefix + ReviewerId, null);
+                var payload = Preferences.Get(GetReviewStateKey(), null);
                 if (string.IsNullOrWhiteSpace(payload)) return;
                 var list = JsonSerializer.Deserialize<List<JsonElement>>(payload);
                 if (list == null) return;
-
                 foreach (var dto in list)
                 {
                     var id = dto.GetProperty("Id").GetInt32();
                     var card = _cards.FirstOrDefault(x => x.Id == id);
                     if (card == null) continue;
-
                     card.Stage = Enum.TryParse<Stage>(dto.GetProperty("Stage").GetString(), out Stage st) ? st : Stage.Seen;
                     card.DueAt = dto.GetProperty("DueAt").GetDateTime();
                     card.Ease = dto.GetProperty("Ease").GetDouble();
@@ -497,17 +422,20 @@ namespace mindvault.Srs
                     card.CountedSkilled = dto.GetProperty("CountedSkilled").GetBoolean();
                     card.CountedMemorized = dto.GetProperty("CountedMemorized").GetBoolean();
                     card.SeenCount = dto.TryGetProperty("SeenCount", out var sc) ? sc.GetInt32() : card.SeenCount;
-
-                    // Rehydrate learned/skilled/memorized tracking sets based on stage
-                    if (card.Stage >= Stage.Learned)
-                    {
-                        _learnedEver.Add(card);
-                        if (card.Stage >= Stage.Skilled) card.CountedSkilled = true;
-                        if (card.Stage == Stage.Memorized) card.CountedMemorized = true;
-                    }
+                    card.Repetitions = dto.TryGetProperty("Repetitions", out var rep) ? rep.GetInt32() : 0;
+                    if (card.Stage >= Stage.Learned) { _learnedEver.Add(card); if (card.Stage >= Stage.Skilled) card.CountedSkilled = true; if (card.Stage == Stage.Memorized) card.CountedMemorized = true; }
                 }
             }
-            catch { }
+            catch (Exception ex) { _logger.Warn("RestoreProgress error: " + ex.Message, "srs"); }
         }
+
+        public SrsEngine(ICoreLogger logger, DatabaseService? db = null)
+        {
+            _logger = logger;
+            _db = db;
+        }
+
+        // Parameterless constructor for callers that don't provide a logger (creates a no-op logger).
+        public SrsEngine() : this(new mindvault.Core.Logging.NullCoreLogger(), null) { }
     }
 }

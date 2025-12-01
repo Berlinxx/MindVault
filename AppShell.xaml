@@ -6,6 +6,18 @@
     xmlns:pages="clr-namespace:mindvault.Pages"
     FlyoutBehavior="Disabled">
 
+  <!-- Customize how shell items render in the flyout: add spacing between icon and text -->
+  <Shell.ItemTemplate>
+    <DataTemplate>
+      <Grid Padding="10">
+        <HorizontalStackLayout Spacing="8" VerticalOptions="Center">
+          <Image Source="{Binding Icon}" WidthRequest="22" HeightRequest="22" VerticalOptions="Center" />
+          <Label Text="{Binding Title}" VerticalOptions="Center" FontSize="14" TextColor="Black" />
+        </HorizontalStackLayout>
+      </Grid>
+    </DataTemplate>
+  </Shell.ItemTemplate>
+
   <!-- Start at Tagline -->
   <ShellContent Route="TaglinePage"
                 ContentTemplate="{DataTemplate pages:TaglinePage}" />

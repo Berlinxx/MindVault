@@ -2,6 +2,8 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using mindvault.Services;
+using mindvault.Controls;
+using CommunityToolkit.Maui.Views;
 
 namespace mindvault.Pages;
 
@@ -41,7 +43,7 @@ public partial class PlayerLobbyPage : ContentPage, INotifyPropertyChanged
         var (ok, error) = await _multi.ConnectToHostAsync();
         if (!ok)
         {
-            await DisplayAlert("Join", error ?? "Unable to connect to host.", "OK");
+            await this.ShowPopupAsync(new AppModal("Join", error ?? "Unable to connect to host.", "OK"));
             await Navigation.PopAsync();
             return;
         }
@@ -91,7 +93,7 @@ public partial class PlayerLobbyPage : ContentPage, INotifyPropertyChanged
     {
         MainThread.BeginInvokeOnMainThread(async () =>
         {
-            try { await DisplayAlert("Host", "The host has left the game.", "OK"); } catch { }
+            try { await this.ShowPopupAsync(new AppModal("Host", "The host has left the game.", "OK")); } catch { }
             _multi.DisconnectClient();
             if (Shell.Current is not null)
                 await Shell.Current.GoToAsync("//HomePage");

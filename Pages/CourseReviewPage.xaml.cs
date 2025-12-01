@@ -12,13 +12,14 @@ using mindvault.Utils.Messages;
 using mindvault.Srs;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
+using System.Collections.Generic;
 
 namespace mindvault.Pages
 {
     public partial class CourseReviewPage : ContentPage, INotifyPropertyChanged
     {
         private readonly DatabaseService _db = ServiceHelper.GetRequiredService<DatabaseService>();
-        private readonly SrsEngine _engine = new();
+        private readonly SrsEngine _engine;
         private SrsCard? _current;
         private bool _front = true;
         private bool _loaded;
@@ -41,6 +42,11 @@ namespace mindvault.Pages
         public bool AnswerButtonsEnabled => !_front;
         public bool SessionComplete { get; private set; }
 
+        // === Concurrency control for mode changes/resets ===
+        private readonly SemaphoreSlim _reloadGate = new(1, 1);
+        private CancellationTokenSource? _reloadCts;
+        private bool _isReloadScheduled;
+
         // === Message wiring for live resets ===
         private void WireMessages()
         {
@@ -53,7 +59,8 @@ namespace mindvault.Pages
             {
                 var (id, mode) = m.Value;
                 if (id != ReviewerId) return;
-                _ = MainThread.InvokeOnMainThreadAsync(async () => await ReloadForModeAsync(mode));
+                // Debounce rapid toggles to avoid overlapping loads that can hang the UI
+                _ = MainThread.InvokeOnMainThreadAsync(async () => await ScheduleReloadForModeAsync(mode));
             });
             // Update round size live without resetting learned stats
             WeakReferenceMessenger.Default.Register<RoundSizeChangedMessage>(this, (r, m) =>
@@ -74,6 +81,10 @@ namespace mindvault.Pages
             });
         }
 
+        private readonly Random _rand = new();
+        private const double BaseFaceFontSize = 24.0; // default review text size
+        public double FaceFontSize { get; private set; } = BaseFaceFontSize;
+
         public string FaceTag => _front ? "[Front]" : "[Back]";
         public string FaceText => _current == null ? string.Empty : (_front ? _current.Question : _current.Answer);
         public string? FaceImage => _current == null ? null : (_front ? _current.QuestionImagePath : _current.AnswerImagePath);
@@ -84,10 +95,16 @@ namespace mindvault.Pages
             InitializeComponent();
             ReviewerId = reviewerId;
             Title = title;
+            _engine = new SrsEngine(new mindvault.Core.Logging.NullCoreLogger(), _db);
             _engine.StateChanged += UpdateBindingsAll;
             BindingContext = this;
             PageHelpers.SetupHamburgerMenu(this);
         }
+
+#if WINDOWS
+        private Microsoft.UI.Xaml.UIElement? _windowContent;
+        private Microsoft.UI.Xaml.Input.KeyEventHandler? _keyDownHandler;
+#endif
 
         protected override async void OnAppearing()
         {
@@ -96,6 +113,16 @@ namespace mindvault.Pages
             WeakReferenceMessenger.Default.UnregisterAll(this);
             WireMessages();
             _roundSize = Preferences.Get($"{PrefRoundSize}_{ReviewerId}", Preferences.Get(PrefRoundSize, 10));
+            
+#if WINDOWS
+            // Delay to ensure Window is initialized
+            _ = Task.Run(async () =>
+            {
+                await Task.Delay(100);
+                MainThread.BeginInvokeOnMainThread(SetupKeyboardHandlers);
+            });
+#endif
+            
             if (_loaded)
             {
                 _roundCount = 0; _batchCorrect = 0; _batchWrong = 0; _batchMistakeCards.Clear();
@@ -126,7 +153,6 @@ namespace mindvault.Pages
 
             if (string.Equals(mode, "Exam", StringComparison.OrdinalIgnoreCase))
             {
-                // Cram / Exam mode loading
                 await _engine.LoadCardsForCramModeAsync(ReviewerId, fetchFunc, CramModeOptions.Fast);
             }
             else
@@ -137,31 +163,75 @@ namespace mindvault.Pages
             UpdateBindingsAll();
         }
 
+        private async Task ScheduleReloadForModeAsync(string? mode)
+        {
+            // Coalesce rapid toggles within a short window and cancel any active reload
+            _isReloadScheduled = true;
+            _reloadCts?.Cancel();
+            _reloadCts?.Dispose();
+            _reloadCts = new CancellationTokenSource();
+            var token = _reloadCts.Token;
+
+            try
+            {
+                await Task.Delay(150, token); // debounce
+            }
+            catch (OperationCanceledException) { return; }
+
+            if (!_isReloadScheduled) return;
+            _isReloadScheduled = false;
+            await ReloadForModeAsync(mode);
+        }
+
         private async Task ReloadForModeAsync(string? mode = null)
         {
-            _roundCount = 0; _batchCorrect = 0; _batchWrong = 0; _batchMistakeCards.Clear();
-            UpdateProgressBar();
-            OnPropertyChanged(nameof(ProgressWidth));
-            _sessionStart = DateTime.UtcNow;
-            SessionComplete = false;
-            _front = true;
-            await LoadEngineAsync(mode);
+            await _reloadGate.WaitAsync();
+            try
+            {
+                _roundCount = 0; _batchCorrect = 0; _batchWrong = 0; _batchMistakeCards.Clear();
+                UpdateProgressBar();
+                OnPropertyChanged(nameof(ProgressWidth));
+                _sessionStart = DateTime.UtcNow;
+                SessionComplete = false;
+                _front = true;
+                await LoadEngineAsync(mode);
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[CourseReview] Reload failed: {ex.Message}");
+            }
+            finally
+            {
+                if (_reloadGate.CurrentCount == 0) _reloadGate.Release();
+            }
         }
 
         private async Task ResetSessionAsync()
         {
-            _sessionStart = DateTime.UtcNow;
-            SessionComplete = false;
-            _front = true;
-            _roundCount = 0; _batchCorrect = 0; _batchWrong = 0; _batchMistakeCards.Clear();
-            await LoadEngineAsync();
-            UpdateProgressBar();
+            _reloadCts?.Cancel();
+            _reloadCts?.Dispose();
+            _reloadCts = new CancellationTokenSource();
+            await _reloadGate.WaitAsync();
+            try
+            {
+                _sessionStart = DateTime.UtcNow;
+                SessionComplete = false;
+                _front = true;
+                _roundCount = 0; _batchCorrect = 0; _batchWrong = 0; _batchMistakeCards.Clear();
+                await LoadEngineAsync();
+                UpdateProgressBar();
+            }
+            finally
+            {
+                if (_reloadGate.CurrentCount == 0) _reloadGate.Release();
+            }
         }
 
         private async void OnFlip(object? s, TappedEventArgs e)
         {
             await FlipAnimationAsync();
             _front = !_front;
+            RandomizeFaceFontSize();
             UpdateBindingsAll();
         }
 
@@ -173,6 +243,19 @@ namespace mindvault.Pages
                 await CardBorder.ScaleXTo(1.0, 110, Easing.CubicOut);
             }
             catch { }
+        }
+
+        private void RandomizeFaceFontSize()
+        {
+            // Randomly choose from 5 sizes: -4, -2, 0, +2, +4 (20, 22, 24, 26, 28) to avoid memorizing letter positions
+            int[] options = new[] { -4, -2, 0, 2, 4 };
+            int delta = options[_rand.Next(options.Length)];
+            var size = Math.Max(12, BaseFaceFontSize + delta); // guard minimum
+            if (Math.Abs(FaceFontSize - size) > 0.01)
+            {
+                FaceFontSize = size;
+                OnPropertyChanged(nameof(FaceFontSize));
+            }
         }
 
         private async void OnPass(object? s, TappedEventArgs e)
@@ -252,6 +335,7 @@ namespace mindvault.Pages
             var previousId = _current?.Id;
             _current = _engine.CurrentCard;
             SessionComplete = _engine.SessionComplete;
+            RandomizeFaceFontSize();
             OnPropertyChanged(nameof(SessionComplete));
             OnPropertyChanged(nameof(FaceText));
             OnPropertyChanged(nameof(FaceTag));
@@ -414,9 +498,99 @@ namespace mindvault.Pages
 
         protected override void OnDisappearing()
         {
+#if WINDOWS
+            CleanupKeyboardHandlers();
+#endif
             // Persist latest progress when user navigates away / closes session
             _engine.SaveProgress();
             base.OnDisappearing();
         }
+
+#if WINDOWS
+        private void SetupKeyboardHandlers()
+        {
+            try
+            {
+                // Add null checks for Window and its properties
+                if (Window?.Handler?.PlatformView is not Microsoft.UI.Xaml.Window nativeWindow)
+                {
+                    Debug.WriteLine("[CourseReview] Window not ready yet, skipping keyboard setup");
+                    return;
+                }
+
+                _windowContent = nativeWindow.Content as Microsoft.UI.Xaml.UIElement;
+                if (_windowContent is null)
+                {
+                    Debug.WriteLine("[CourseReview] Window content is null, skipping keyboard setup");
+                    return;
+                }
+
+                // Remove existing handler if any
+                if (_keyDownHandler is not null && _windowContent is not null)
+                {
+                    _windowContent.KeyDown -= _keyDownHandler;
+                }
+
+                _keyDownHandler = new Microsoft.UI.Xaml.Input.KeyEventHandler((sender, e) =>
+                {
+                    var key = e.Key;
+                    bool handled = false;
+
+                    // Flip card: Space, Up, Down, W, S
+                    if (key == Windows.System.VirtualKey.Space ||
+                        key == Windows.System.VirtualKey.Up ||
+                        key == Windows.System.VirtualKey.Down ||
+                        key == Windows.System.VirtualKey.W ||
+                        key == Windows.System.VirtualKey.S)
+                    {
+                        MainThread.BeginInvokeOnMainThread(() => OnFlip(null, null!));
+                        handled = true;
+                    }
+                    // Fail (X button): Left, A
+                    else if ((key == Windows.System.VirtualKey.Left || key == Windows.System.VirtualKey.A) && AnswerButtonsEnabled)
+                    {
+                        MainThread.BeginInvokeOnMainThread(() => OnFail(null, null!));
+                        handled = true;
+                    }
+                    // Pass (Check button): Right, D
+                    else if ((key == Windows.System.VirtualKey.Right || key == Windows.System.VirtualKey.D) && AnswerButtonsEnabled)
+                    {
+                        MainThread.BeginInvokeOnMainThread(() => OnPass(null, null!));
+                        handled = true;
+                    }
+
+                    e.Handled = handled;
+                });
+
+                _windowContent.KeyDown += _keyDownHandler;
+                Debug.WriteLine("[CourseReview] Keyboard handlers registered");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[CourseReview] Failed to setup keyboard handlers: {ex.Message}");
+            }
+        }
+
+        private void CleanupKeyboardHandlers()
+        {
+            try
+            {
+                if (_windowContent is not null && _keyDownHandler is not null)
+                {
+                    _windowContent.KeyDown -= _keyDownHandler;
+                    Debug.WriteLine("[CourseReview] Keyboard handlers unregistered");
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[CourseReview] Failed to cleanup keyboard handlers: {ex.Message}");
+            }
+            finally
+            {
+                _windowContent = null;
+                _keyDownHandler = null;
+            }
+        }
+#endif
     }
 }

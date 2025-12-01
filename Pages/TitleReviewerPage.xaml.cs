@@ -20,6 +20,17 @@ public partial class TitleReviewerPage : ContentPage
 
     private async void OnCreateNewTapped(object sender, EventArgs e)
     {
+        await CreateNewReviewerAsync();
+    }
+
+    private async void OnTitleEntryCompleted(object? sender, EventArgs e)
+    {
+        // Called when user presses Enter/Done on keyboard
+        await CreateNewReviewerAsync();
+    }
+
+    private async Task CreateNewReviewerAsync()
+    {
         if (_isCreating) return;
         _isCreating = true;
         try
@@ -52,6 +63,12 @@ public partial class TitleReviewerPage : ContentPage
     {
         base.OnAppearing();
         _ = RunEntryAnimationAsync();
+    }
+
+    protected override void OnDisappearing()
+    {
+        base.OnDisappearing();
+        try { if (TitleEntry is not null) TitleEntry.Text = string.Empty; } catch { }
     }
 
     async Task RunEntryAnimationAsync()

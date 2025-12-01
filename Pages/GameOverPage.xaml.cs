@@ -1,5 +1,7 @@
 using System.Collections.ObjectModel;
 using mindvault.Services;
+using mindvault.Controls;
+using CommunityToolkit.Maui.Views;
 
 namespace mindvault.Pages;
 
@@ -55,7 +57,7 @@ public partial class GameOverPage : ContentPage
     {
         MainThread.BeginInvokeOnMainThread(async () =>
         {
-            try { await DisplayAlert("Host", "The host has left the game.", "OK"); } catch { }
+            try { await this.ShowPopupAsync(new AppModal("Host", "The host has left the game.", "OK")); } catch { }
             _multi.DisconnectClient();
             if (Shell.Current is not null)
                 await Shell.Current.GoToAsync("//HomePage");
@@ -71,6 +73,7 @@ public partial class GameOverPage : ContentPage
         public int Points { get; set; }
         public string PointsText => $"{Points} pts";
         public string Image { get; set; } = "avatar1.png";
+        public bool IsLeader => Rank == 1;
     }
 
     private async void OnLobbyClicked(object? sender, EventArgs e)

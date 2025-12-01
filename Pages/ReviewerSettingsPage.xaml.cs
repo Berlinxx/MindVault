@@ -1,3 +1,5 @@
+using CommunityToolkit.Maui.Views;
+using mindvault.Controls;
 using mindvault.Services;
 using mindvault.Utils;
 using System.Diagnostics;
@@ -148,7 +150,8 @@ public partial class ReviewerSettingsPage : ContentPage, INotifyPropertyChanged
 
     private async void OnResetProgressTapped(object? sender, TappedEventArgs e)
     {
-        var confirm = await this.DisplayAlert("Reset Progress", "This will erase your review progress for this course. Continue?", "Reset", "Cancel");
+        var confirmResult = await this.ShowPopupAsync(new AppModal("Reset Progress", "This will erase your review progress for this course. Continue?", "Reset", "Cancel"));
+        var confirm = confirmResult is bool b && b;
         if (!confirm) return;
 
         try
@@ -164,16 +167,16 @@ public partial class ReviewerSettingsPage : ContentPage, INotifyPropertyChanged
             {
                 Preferences.Remove(PrefReviewStatePrefix + reviewerId);
                 WeakReferenceMessenger.Default.Send(new ProgressResetMessage(reviewerId));
-                await this.DisplayAlert("Progress Reset", "Your review progress has been cleared.", "OK");
+                this.ShowPopup(new AppModal("Progress Reset", "Your review progress has been cleared.", "OK"));
             }
             else
             {
-                await this.DisplayAlert("Not Found", "Could not resolve the current course.", "OK");
+                this.ShowPopup(new AppModal("Not Found", "Could not resolve the current course.", "OK"));
             }
         }
         catch (Exception ex)
         {
-            await this.DisplayAlert("Reset Failed", ex.Message, "OK");
+            this.ShowPopup(new AppModal("Reset Failed", ex.Message, "OK"));
         }
     }
 

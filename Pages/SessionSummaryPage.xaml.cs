@@ -1,3 +1,5 @@
+using CommunityToolkit.Maui.Views;
+using mindvault.Controls;
 using Microsoft.Maui.Controls;
 using System;
 using mindvault.Utils;
@@ -72,7 +74,7 @@ public partial class SessionSummaryPage : ContentPage
         }
         else
         {
-            await DisplayAlert("No Mistakes", "You didn't make any mistakes this round!", "OK");
+            this.ShowPopup(new AppModal("No Mistakes", "You didn't make any mistakes this round!", "OK"));
         }
     }
     async void OnStudyMore(object? sender, EventArgs e) => await Navigation.PopAsync();

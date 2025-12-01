@@ -1,3 +1,5 @@
+using CommunityToolkit.Maui.Views;
+using mindvault.Controls;
 using mindvault.Services;
 using mindvault.Utils;
 using System.Text.RegularExpressions;
@@ -26,7 +28,7 @@ public partial class MultiplayerPage : ContentPage
     {
         if (!_multi.HasLocalNetworkPath())
         {
-            await DisplayAlert("Network", "Turn on Wi‑Fi hotspot or connect to a LAN/Wi‑Fi network, then try again.", "OK");
+            this.ShowPopup(new AppModal("Network", "Turn on Wi‑Fi hotspot or connect to a LAN/Wi‑Fi network, then try again.", "OK"));
             return;
         }
 
@@ -34,7 +36,7 @@ public partial class MultiplayerPage : ContentPage
         var (ok, error) = await _multi.StartHostingAsync(code);
         if (!ok)
         {
-            await DisplayAlert("Hosting", error ?? "Failed to start hosting.", "OK");
+            this.ShowPopup(new AppModal("Hosting", error ?? "Failed to start hosting.", "OK"));
             return;
         }
 
@@ -88,7 +90,7 @@ public partial class MultiplayerPage : ContentPage
             var code = RoomCodeEntry?.Text ?? string.Empty;
             if (!CodeRx.IsMatch(code))
             {
-                await DisplayAlert("Room Code", "Please enter a valid 5-character code (letters or numbers).", "OK");
+                this.ShowPopup(new AppModal("Room Code", "Please enter a valid 5-character code (letters or numbers).", "OK"));
                 return;
             }
 
@@ -99,7 +101,7 @@ public partial class MultiplayerPage : ContentPage
             var (ok, error) = await _multi.DiscoverHostAsync(code, TimeSpan.FromSeconds(2));
             if (!ok)
             {
-                await DisplayAlert("Join", error ?? "Room not found. Check the code and ensure both devices are on the same Wi‑Fi or hotspot.", "OK");
+                this.ShowPopup(new AppModal("Join", error ?? "Room not found. Check the code and ensure both devices are on the same Wi‑Fi or hotspot.", "OK"));
                 return;
             }
 

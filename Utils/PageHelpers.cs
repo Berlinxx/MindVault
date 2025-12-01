@@ -1,3 +1,5 @@
+using CommunityToolkit.Maui.Views;
+using mindvault.Controls;
 using mindvault.Controls;
 using mindvault.Utils;
 
@@ -38,7 +40,7 @@ public static class PageHelpers
         }
         catch (Exception ex)
         {
-            await page.DisplayAlert("Navigation Error", fallbackMessage, "OK");
+            page.ShowPopup(new AppModal("Navigation Error", fallbackMessage, "OK"));
             System.Diagnostics.Debug.WriteLine($"Navigation error: {ex.Message}");
         }
     }
@@ -50,7 +52,7 @@ public static class PageHelpers
     {
         try
         {
-            await page.DisplayAlert(title, message, cancel);
+            page.ShowPopup(new AppModal(title, message, cancel));
         }
         catch (Exception ex)
         {
@@ -65,7 +67,8 @@ public static class PageHelpers
     {
         try
         {
-            return await page.DisplayAlert(title, message, accept, cancel);
+            var result = await page.ShowPopupAsync(new AppModal(title, message, accept, cancel));
+            return result is bool b && b;
         }
         catch (Exception ex)
         {

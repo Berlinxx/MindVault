@@ -24,7 +24,7 @@ namespace mindvault.Converters
         public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
         {
             var isReady = value is bool b && b;
-            return isReady ? "READY ?" : "READY!";
+            return isReady ? "NOT READY" : "I'M READY";
         }
 
         public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)

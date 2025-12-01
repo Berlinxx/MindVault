@@ -17,6 +17,8 @@
     <Color x:Key="TextSecondary">#59636F</Color>
     <Color x:Key="Accent">#0E6A85</Color>
     <Color x:Key="BarBg">#F2F6FA</Color>
+    <Color x:Key="CorrectColor">#0BA85A</Color>
+    <Color x:Key="WrongColor">#E33A3A</Color>
 
     <Style x:Key="CardStyle" TargetType="Border">
       <Setter Property="BackgroundColor" Value="{StaticResource Surface}" />
@@ -55,6 +57,7 @@
 
     <!-- Converters -->
     <conv:InverseBoolConverter x:Key="InverseBoolConverter" />
+    <conv:TruncateConverter x:Key="TruncateConverter" />
   </ContentPage.Resources>
 
   <!-- BACKGROUND -->
@@ -74,19 +77,31 @@
         <controls:HamburgerButton x:Name="HamburgerButton" />
 
         <HorizontalStackLayout Grid.Column="1" Spacing="6" VerticalOptions="Center">
-          <Label Text="{Binding Title}" FontAttributes="Bold" FontSize="18"
-                 TextColor="{StaticResource TextPrimary}" />
-          <Label Text="&#xF013;" FontFamily="FAS" FontSize="14" TextColor="{StaticResource Primary}">
-            <Label.GestureRecognizers>
+          <Label Text="{Binding Title, Converter={StaticResource TruncateConverter}, ConverterParameter=15}"
+                 FontAttributes="Bold" FontSize="20" TextColor="{StaticResource TextPrimary}"
+                 SemanticProperties.HeadingLevel="Level1"
+                 SemanticProperties.Description="Deck title" />
+
+          <Border WidthRequest="34" HeightRequest="34" Stroke="#E8EDF2" StrokeThickness="1"
+                  StrokeShape="Ellipse" BackgroundColor="White" HorizontalOptions="Center" VerticalOptions="Center" Margin="2,0,0,0"
+                  ToolTipProperties.Text="Deck settings"
+                  SemanticProperties.Description="Settings button"
+                  SemanticProperties.Hint="Opens deck settings and preferences">
+            <Label Text="&#xF013;" FontFamily="FontAwesome6FreeSolid" FontSize="15" TextColor="{StaticResource Primary}"
+                   HorizontalOptions="Center" VerticalOptions="Center"/>
+            <Border.GestureRecognizers>
               <TapGestureRecognizer Tapped="OnSettingsTapped"/>
-            </Label.GestureRecognizers>
-          </Label>
+            </Border.GestureRecognizers>
+          </Border>
         </HorizontalStackLayout>
 
         <!-- (optional) settings icon space already above; here is close X -->
         <Border Grid.Column="3" WidthRequest="34" HeightRequest="34"
-                Stroke="#E8EDF2" StrokeThickness="1" StrokeShape="Ellipse" BackgroundColor="White">
-          <Label Text="&#xF00D;" FontFamily="FAS" FontSize="14" TextColor="{StaticResource TextPrimary}"
+                Stroke="#E8EDF2" StrokeThickness="1" StrokeShape="Ellipse" BackgroundColor="White"
+                ToolTipProperties.Text="Exit review session"
+                SemanticProperties.Description="Close button"
+                SemanticProperties.Hint="Exits the review session and returns to deck list">
+          <Label Text="&#xF00D;" FontFamily="FontAwesome6FreeSolid" FontSize="14" TextColor="{StaticResource TextPrimary}"
                  HorizontalOptions="Center" VerticalOptions="Center"/>
           <Border.GestureRecognizers>
             <TapGestureRecognizer Tapped="OnCloseTapped"/>
@@ -101,7 +116,8 @@
 
         <!-- Progress bar -->
         <Border BackgroundColor="{StaticResource BarBg}" HeightRequest="14"
-                StrokeShape="RoundRectangle 8" StrokeThickness="0">
+                StrokeShape="RoundRectangle 8" StrokeThickness="0"
+                SemanticProperties.Description="Review progress indicator">
           <Border BackgroundColor="{StaticResource PrimaryDark}" StrokeThickness="0"
                   StrokeShape="RoundRectangle 8"
                   HorizontalOptions="Start" WidthRequest="{Binding ProgressWidth}" />
@@ -112,35 +128,35 @@
           <Grid ColumnDefinitions="*,*,*,*,*" Padding="4,6">
             <VerticalStackLayout Spacing="0" Grid.Column="0" HorizontalOptions="Center">
               <Label Text="Avail" FontSize="11" TextColor="{StaticResource TextSecondary}" />
-              <Label Text="{Binding Avail}" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}" />
+              <Label Text="{Binding Avail}" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}" HorizontalTextAlignment="Center" />
               <VerticalStackLayout.GestureRecognizers>
                 <TapGestureRecognizer Tapped="OnBucketTapped" CommandParameter="Avail"/>
               </VerticalStackLayout.GestureRecognizers>
             </VerticalStackLayout>
             <VerticalStackLayout Spacing="0" Grid.Column="1" HorizontalOptions="Center">
               <Label Text="Seen" FontSize="11" TextColor="{StaticResource TextSecondary}" />
-              <Label Text="{Binding Seen}" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}" />
+              <Label Text="{Binding Seen}" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}" HorizontalTextAlignment="Center" />
               <VerticalStackLayout.GestureRecognizers>
                 <TapGestureRecognizer Tapped="OnBucketTapped" CommandParameter="Seen"/>
               </VerticalStackLayout.GestureRecognizers>
             </VerticalStackLayout>
             <VerticalStackLayout Spacing="0" Grid.Column="2" HorizontalOptions="Center">
               <Label Text="Learned" FontSize="11" TextColor="{StaticResource TextSecondary}" />
-              <Label Text="{Binding Learned}" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}" />
+              <Label Text="{Binding Learned}" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}" HorizontalTextAlignment="Center" />
               <VerticalStackLayout.GestureRecognizers>
                 <TapGestureRecognizer Tapped="OnBucketTapped" CommandParameter="Learned"/>
               </VerticalStackLayout.GestureRecognizers>
             </VerticalStackLayout>
             <VerticalStackLayout Spacing="0" Grid.Column="3" HorizontalOptions="Center">
               <Label Text="Skilled" FontSize="11" TextColor="{StaticResource TextSecondary}" />
-              <Label Text="{Binding Skilled}" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}" />
+              <Label Text="{Binding Skilled}" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}" HorizontalTextAlignment="Center" />
               <VerticalStackLayout.GestureRecognizers>
                 <TapGestureRecognizer Tapped="OnBucketTapped" CommandParameter="Skilled"/>
               </VerticalStackLayout.GestureRecognizers>
             </VerticalStackLayout>
             <VerticalStackLayout Spacing="0" Grid.Column="4" HorizontalOptions="Center">
               <Label Text="Memorized" FontSize="11" TextColor="{StaticResource TextSecondary}" />
-              <Label Text="{Binding Memorized}" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}" />
+              <Label Text="{Binding Memorized}" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}" HorizontalTextAlignment="Center" />
               <VerticalStackLayout.GestureRecognizers>
                 <TapGestureRecognizer Tapped="OnBucketTapped" CommandParameter="Memorized"/>
               </VerticalStackLayout.GestureRecognizers>
@@ -165,7 +181,7 @@
               <!-- With image: stack text over image -->
               <Grid IsVisible="{Binding FaceImageVisible}">
                 <VerticalStackLayout Spacing="8" HorizontalOptions="Center">
-                  <Label Text="{Binding FaceText}" FontSize="24" TextColor="{StaticResource TextPrimary}"
+                  <Label Text="{Binding FaceText}" FontSize="{Binding FaceFontSize}" TextColor="{StaticResource TextPrimary}"
                          HorizontalTextAlignment="Center" />
                   <Image x:Name="FaceImageView" Source="{Binding FaceImage}" Aspect="AspectFit" HeightRequest="240">
                     <Image.GestureRecognizers>
@@ -177,7 +193,7 @@
 
               <!-- No image: center text vertically/horizontally -->
               <Grid IsVisible="{Binding FaceImageVisible, Converter={StaticResource InverseBoolConverter}}">
-                <Label Text="{Binding FaceText}" FontSize="24" TextColor="{StaticResource TextPrimary}"
+                <Label Text="{Binding FaceText}" FontSize="{Binding FaceFontSize}" TextColor="{StaticResource TextPrimary}"
                        HorizontalOptions="Center" VerticalOptions="Center"
                        HorizontalTextAlignment="Center" VerticalTextAlignment="Center" />
               </Grid>
@@ -186,10 +202,13 @@
             <!-- Bottom of card: skip chip + speaker -->
             <Grid Grid.Row="2" ColumnDefinitions="*,Auto,Auto" Padding="0,10,0,0">
               <Border Grid.Column="1" BackgroundColor="#E6E6E6"
-                      StrokeShape="RoundRectangle 14" Padding="16,6" >
+                      StrokeShape="RoundRectangle 14" Padding="16,6"
+                      ToolTipProperties.Text="Skip this card"
+                      SemanticProperties.Description="Skip button"
+                      SemanticProperties.Hint="Moves to the next card without answering">
                 <HorizontalStackLayout Spacing="8">
                   <Label Text="Skip" />
-                  <Label Text="&#xF061;" FontFamily="FAS" FontSize="12" />
+                  <Label Text="&#xF061;" FontFamily="FontAwesome6FreeSolid" FontSize="12" />
                 </HorizontalStackLayout>
                 <Border.GestureRecognizers>
                   <TapGestureRecognizer Tapped="OnSkip"/>
@@ -197,8 +216,11 @@
               </Border>
 
               <Border x:Name="SpeakButton" Grid.Column="2" WidthRequest="34" HeightRequest="34"
-                      Stroke="#E8EDF2" StrokeThickness="1" StrokeShape="Ellipse" BackgroundColor="White" Margin="10,0,0,0">
-                <Label Text="&#xF028;" FontFamily="FAS" FontSize="14" TextColor="{StaticResource TextPrimary}"
+                      Stroke="#E8EDF2" StrokeThickness="1" StrokeShape="Ellipse" BackgroundColor="White" Margin="10,0,0,0"
+                      ToolTipProperties.Text="Read text aloud"
+                      SemanticProperties.Description="Text to speech button"
+                      SemanticProperties.Hint="Reads the current card text aloud">
+                <Label Text="&#xF028;" FontFamily="FontAwesome6FreeSolid" FontSize="14" TextColor="{StaticResource TextPrimary}"
                        HorizontalOptions="Center" VerticalOptions="Center"/>
                 <Border.GestureRecognizers>
                   <TapGestureRecognizer Tapped="OnSpeakTapped"/>
@@ -216,7 +238,10 @@
             Grid.Column="0"
             BackgroundColor="#C5D6E4"
             IsEnabled="{Binding AnswerButtonsEnabled}"
-            Style="{StaticResource Pill}">
+            Style="{StaticResource Pill}"
+            ToolTipProperties.Text="Mark as incorrect"
+            SemanticProperties.Description="Incorrect button"
+            SemanticProperties.Hint="Marks this card as incorrectly answered">
             <Border.Triggers>
               <DataTrigger
                 Binding="{Binding IsEnabled, Source={x:Reference FailButton}}"
@@ -226,7 +251,7 @@
               </DataTrigger>
             </Border.Triggers>
             <Grid ColumnDefinitions="Auto,*">
-              <Label Text="&#xF00D;" FontFamily="FAS" TextColor="{StaticResource Ink}" />
+              <Label Text="&#xF00D;" FontFamily="FontAwesome6FreeSolid" TextColor="{StaticResource Ink}" />
               <Label Grid.Column="1" Text="" />
             </Grid>
             <Border.GestureRecognizers>
@@ -235,7 +260,10 @@
           </Border>
 
           <!-- Flip -->
-          <Border Grid.Column="1" BackgroundColor="White" Style="{StaticResource Pill}" Margin="12,0">
+          <Border Grid.Column="1" BackgroundColor="White" Style="{StaticResource Pill}" Margin="12,0"
+                  ToolTipProperties.Text="Flip card (Space)"
+                  SemanticProperties.Description="Flip card button"
+                  SemanticProperties.Hint="Flips the card to show the answer or question">
             <Label Text="Flip" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}" />
             <Border.GestureRecognizers>
               <TapGestureRecognizer Tapped="OnFlip"/>
@@ -248,7 +276,10 @@
             Grid.Column="2"
             BackgroundColor="#8AB8D3"
             IsEnabled="{Binding AnswerButtonsEnabled}"
-            Style="{StaticResource Pill}">
+            Style="{StaticResource Pill}"
+            ToolTipProperties.Text="Mark as correct"
+            SemanticProperties.Description="Correct button"
+            SemanticProperties.Hint="Marks this card as correctly answered">
             <Border.Triggers>
               <DataTrigger
                 Binding="{Binding IsEnabled, Source={x:Reference PassButton}}"
@@ -259,7 +290,7 @@
             </Border.Triggers>
             <Grid ColumnDefinitions="*,Auto">
               <Label Text="" />
-              <Label Grid.Column="1" Text="&#xF00C;" FontFamily="FAS" TextColor="White" />
+              <Label Grid.Column="1" Text="&#xF00C;" FontFamily="FontAwesome6FreeSolid" TextColor="White" />
             </Grid>
             <Border.GestureRecognizers>
               <TapGestureRecognizer Tapped="OnPass"/>
@@ -275,27 +306,39 @@
 
     <!-- COMPLETION OVERLAY -->
     <Grid x:Name="CompletionOverlay" Grid.RowSpan="2" BackgroundColor="#B3000000" IsVisible="{Binding SessionComplete}" Opacity="0">
-      <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto" Padding="20" HorizontalOptions="Center" VerticalOptions="Center" WidthRequest="320">
-        <Grid x:Name="ConfettiHost" Grid.RowSpan="6"/>
-        <Border Grid.Row="0" BackgroundColor="White" StrokeThickness="0" StrokeShape="RoundRectangle 16" Padding="18">
-          <VerticalStackLayout Spacing="8">
-            <Label Text="All Done!" FontAttributes="Bold" FontSize="20" HorizontalTextAlignment="Center"/>
-            <Label Text="{Binding Title}" FontSize="14" HorizontalTextAlignment="Center"/>
-            <Label Text="{Binding ElapsedText}" FontSize="12" HorizontalTextAlignment="Center"/>
-            <Grid ColumnDefinitions="*,*" Padding="0,8,0,0">
-              <Label Grid.Column="0" Text="Correct: {Binding CorrectCount}" HorizontalTextAlignment="Center"/>
-              <Label Grid.Column="1" Text="Wrong: {Binding WrongCount}" HorizontalTextAlignment="Center"/>
-            </Grid>
-            <Grid ColumnDefinitions="*,*" ColumnSpacing="8" Margin="0,8,0,0">
-              <Button Text="Review Mistakes" Clicked="OnReviewMistakes"/>
-              <Button Grid.Column="1" Text="Study More" Clicked="OnStudyMore"/>
-            </Grid>
-            <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
-              <Button Text="Add Cards" Clicked="OnAddCards"/>
-              <Button Grid.Column="1" Text="Back to List" Clicked="OnBackToList"/>
-            </Grid>
-          </VerticalStackLayout>
-        </Border>
+      <!-- wrap inner content in a 3-column container so the content is precisely centered -->
+      <Grid RowDefinitions="Auto" Padding="20">
+        <Grid ColumnDefinitions="*,Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto" HorizontalOptions="Fill" VerticalOptions="Center">
+          <Grid x:Name="ConfettiHost" Grid.RowSpan="6" Grid.Column="1" />
+          <Border Grid.Row="0" Grid.Column="1" BackgroundColor="White" StrokeThickness="0" StrokeShape="RoundRectangle 16" Padding="18" WidthRequest="320" HorizontalOptions="Center">
+            <VerticalStackLayout Spacing="12" HorizontalOptions="Center">
+              <Label Text="Session Complete!" FontAttributes="Bold" FontSize="20" HorizontalTextAlignment="Center" TextColor="{StaticResource Surface}"/>
+
+              <!-- Stats cards -->
+              <HorizontalStackLayout Spacing="16" HorizontalOptions="Center">
+                <Border BackgroundColor="#F2F6FA" StrokeShape="RoundRectangle 12" Padding="10" WidthRequest="120" HeightRequest="90" VerticalOptions="Center">
+                  <VerticalStackLayout Spacing="4" HorizontalOptions="Center" VerticalOptions="Center">
+                    <Label Text="Correct:" FontSize="12" TextColor="{StaticResource CorrectColor}" HorizontalTextAlignment="Center" FontAttributes="Bold" />
+                    <Label Text="{Binding CorrectCount}" FontSize="40" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}" HorizontalOptions="Center" VerticalOptions="Center" HorizontalTextAlignment="Center" VerticalTextAlignment="Center" />
+                  </VerticalStackLayout>
+                </Border>
+                <Border BackgroundColor="#F2F6FA" StrokeShape="RoundRectangle 12" Padding="10" WidthRequest="120" HeightRequest="90" VerticalOptions="Center">
+                  <VerticalStackLayout Spacing="4" HorizontalOptions="Center" VerticalOptions="Center">
+                    <Label Text="Wrong:" FontSize="12" TextColor="{StaticResource WrongColor}" HorizontalTextAlignment="Center" FontAttributes="Bold" />
+                    <Label Text="{Binding WrongCount}" FontSize="40" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}" HorizontalOptions="Center" VerticalOptions="Center" HorizontalTextAlignment="Center" VerticalTextAlignment="Center" />
+                  </VerticalStackLayout>
+                </Border>
+              </HorizontalStackLayout>
+
+              <Label Text="{Binding ElapsedText}" FontSize="12" TextColor="{StaticResource Surface}" HorizontalTextAlignment="Center" />
+              <Label Text="Need more data for estimate." FontSize="12" TextColor="{StaticResource Surface}" HorizontalTextAlignment="Center" />
+
+              <Button Text="Study More" WidthRequest="280" HeightRequest="44" CornerRadius="8" BackgroundColor="White" TextColor="{StaticResource TextPrimary}" Clicked="OnStudyMore"/>
+              <Button Text="Back to Reviewers" WidthRequest="280" HeightRequest="44" CornerRadius="8" BackgroundColor="White" TextColor="{StaticResource TextPrimary}" Clicked="OnBackToList"/>
+
+            </VerticalStackLayout>
+          </Border>
+        </Grid>
       </Grid>
     </Grid>
 

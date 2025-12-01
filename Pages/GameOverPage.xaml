@@ -52,12 +52,12 @@
       <!-- Leaderboard -->
       <Border Style="{StaticResource Card}">
         <VerticalStackLayout Spacing="8">
-          <Label Text="Leaderboard" FontAttributes="Bold" FontSize="16"/>
+          <Label Text="Leaderboard" FontAttributes="Bold" FontSize="16" TextColor="Black"/>
           <CollectionView ItemsSource="{Binding Rows}" SelectionMode="None">
             <CollectionView.ItemTemplate>
               <DataTemplate>
                 <Grid ColumnDefinitions="Auto,Auto,*,Auto" Padding="6,8" ColumnSpacing="10">
-                  <Label Grid.Column="0" Text="{Binding Rank}" FontAttributes="Bold"/>
+                  <Label Grid.Column="0" Text="{Binding Rank}" FontAttributes="Bold" TextColor="Black"/>
 
                   <Grid Grid.Column="1">
                     <Border WidthRequest="36" HeightRequest="36" StrokeShape="Ellipse" StrokeThickness="0" BackgroundColor="#E8DFFB">
@@ -67,10 +67,14 @@
                         </Image.Clip>
                       </Image>
                     </Border>
+                    <!-- crown for rank 1 -->
+                    <Label IsVisible="{Binding IsLeader}"
+                           Text="&#xF521;" FontFamily="FontAwesome6FreeSolid" FontSize="14" TextColor="#F1C40F"
+                           TranslationX="-5" TranslationY="-5"/>
                   </Grid>
 
                   <Label Grid.Column="2" TextColor="Black" Text="{Binding Name}" />
-                  <Label Grid.Column="3" Text="{Binding PointsText}" />
+                  <Label Grid.Column="3" Text="{Binding PointsText}" TextColor="Black" />
                 </Grid>
               </DataTemplate>
             </CollectionView.ItemTemplate>
@@ -79,10 +83,16 @@
       </Border>
 
       <!-- Actions -->
-      <HorizontalStackLayout Spacing="12" HorizontalOptions="Center">
-        <Button Text="Lobby" Clicked="OnLobbyClicked"/>
-        <Button Text="Exit" Clicked="OnExitClicked"/>
-      </HorizontalStackLayout>
+      <VerticalStackLayout Spacing="12" HorizontalOptions="Center" Margin="0,24,0,0">
+        <Button Text="LOBBY" Clicked="OnLobbyClicked" 
+                BackgroundColor="#1B4F5C" TextColor="White" 
+                CornerRadius="25" WidthRequest="280" HeightRequest="50"
+                FontAttributes="Bold" FontSize="16"/>
+        <Button Text="EXIT" Clicked="OnExitClicked"
+                BackgroundColor="#1B4F5C" TextColor="White" 
+                CornerRadius="25" WidthRequest="280" HeightRequest="50"
+                FontAttributes="Bold" FontSize="16"/>
+      </VerticalStackLayout>
 
     </VerticalStackLayout>
   </ScrollView>

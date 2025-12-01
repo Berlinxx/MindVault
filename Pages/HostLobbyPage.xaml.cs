@@ -1,3 +1,5 @@
+using CommunityToolkit.Maui.Views;
+using mindvault.Controls;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
@@ -52,6 +54,26 @@ public partial class HostLobbyPage : ContentPage, INotifyPropertyChanged
         _multi.HostParticipantReadyChanged += OnHostParticipantReadyChanged;
 
         OnPropertyChanged(nameof(ParticipantsHeader));
+    }
+
+    private void OnFlashcardDropdownTapped(object? sender, EventArgs e)
+    {
+        if (FlashcardDropdownList != null)
+        {
+            FlashcardDropdownList.IsVisible = !FlashcardDropdownList.IsVisible;
+        }
+    }
+
+    private void OnFlashcardDropdownItemTapped(object? sender, TappedEventArgs e)
+    {
+        if (e.Parameter is string selectedOption)
+        {
+            SelectedFlashcard = selectedOption;
+            if (FlashcardDropdownList != null)
+            {
+                FlashcardDropdownList.IsVisible = false;
+            }
+        }
     }
 
     protected override async void OnAppearing()
@@ -174,14 +196,14 @@ public partial class HostLobbyPage : ContentPage, INotifyPropertyChanged
         var (started, error) = await _multi.TryStartGameAsync();
         if (!started)
         {
-            await DisplayAlert("Not Ready", error ?? "Not all participants are ready.", "OK");
+            this.ShowPopup(new AppModal("Not Ready", error ?? "Not all participants are ready.", "OK"));
             return;
         }
 
         var selected = _reviewers.FirstOrDefault(r => r.Title == SelectedFlashcard);
         if (selected is null)
         {
-            await DisplayAlert("Start", "Please select a deck.", "OK");
+            this.ShowPopup(new AppModal("Start", "Please select a deck.", "OK"));
             return;
         }
 

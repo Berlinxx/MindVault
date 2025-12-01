@@ -11,6 +11,9 @@ namespace mindvault.Services;
 public class PythonFlashcardService
 {
     readonly PythonBootstrapper _bootstrapper;
+    private DateTime _lastProgressReport = DateTime.MinValue;
+    private const int PROGRESS_REPORT_THROTTLE_MS = 200; // Throttle at source
+    
     public PythonFlashcardService(PythonBootstrapper bootstrapper) => _bootstrapper = bootstrapper;
 
     void Log(string msg)
@@ -22,13 +25,16 @@ public class PythonFlashcardService
         Log("Generation started");
         await _bootstrapper.EnsurePythonReadyAsync(progress, ct);
 
-        // After bootstrap, verify llama_cpp again
         if (!await CheckModuleAsync("llama_cpp"))
         { Log("llama_cpp still not importable after bootstrap"); progress?.Report("llama-cpp-python import failed. See run_log.txt"); return new List<FlashcardItem>(); }
 
         var workDir = _bootstrapper.PythonWorkDir;
         Directory.CreateDirectory(workDir);
-        _bootstrapper.GetLocalModelPath();
+        
+        // Ensure model is in Models directory
+        var modelsDir = Path.Combine(workDir, "Models");
+        Directory.CreateDirectory(modelsDir);
+        
         var lessonPath = Path.Combine(workDir, "lesson_input.txt");
         await File.WriteAllTextAsync(lessonPath, lessonText, ct);
         Log($"Wrote lesson_input.txt length={lessonText.Length}");
@@ -36,13 +42,11 @@ public class PythonFlashcardService
         var script = _bootstrapper.PrepareScriptToLocal();
         if (string.IsNullOrEmpty(script)) throw new FileNotFoundException("flashcard_ai.py missing");
 
-        Directory.CreateDirectory(Path.Combine(workDir, "Models"));
-
         progress?.Report("Running AI model...");
         Log("Launching python process");
         var psi = new ProcessStartInfo
         {
-            FileName = Path.Combine(workDir, "python.exe"),
+            FileName = _bootstrapper.PythonExePath,
             Arguments = $"\"{script}\" \"{lessonPath}\"",
             WorkingDirectory = workDir,
             UseShellExecute = false,
@@ -58,7 +62,17 @@ public class PythonFlashcardService
         {
             if (e.Data is null) return;
             try { stdout.AppendLine(e.Data); } catch { }
-            try { progress?.Report(e.Data); } catch { }
+            
+            // Throttle progress reports to avoid flooding UI thread
+            var now = DateTime.UtcNow;
+            bool shouldReport = (now - _lastProgressReport).TotalMilliseconds >= PROGRESS_REPORT_THROTTLE_MS;
+            
+            // Always report special messages (TOTAL, DONE) immediately
+            if (e.Data.Contains("::TOTAL::") || e.Data.Contains("::DONE::") || shouldReport)
+            {
+                _lastProgressReport = now;
+                try { progress?.Report(e.Data); } catch { }
+            }
         };
         proc.ErrorDataReceived += (s, e) =>
         {
@@ -103,7 +117,7 @@ public class PythonFlashcardService
         {
             var psi = new ProcessStartInfo
             {
-                FileName = Path.Combine(_bootstrapper.PythonWorkDir, "python.exe"),
+                FileName = _bootstrapper.PythonExePath,
                 Arguments = $"-c \"import {module}\"",
                 WorkingDirectory = _bootstrapper.PythonWorkDir,
                 UseShellExecute = false,

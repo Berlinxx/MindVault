@@ -55,13 +55,23 @@ public partial class ExportPage : ContentPage
             }
 
             var lines = new List<string> { $"Reviewer: {ReviewerTitle}", $"Questions: {Cards.Count}", string.Empty };
+            
+            // Export progress data if available
+            var progressData = ExportProgressData();
+            if (!string.IsNullOrEmpty(progressData))
+            {
+                lines.Add("Progress: ENABLED");
+                lines.Add($"ProgressData: {progressData}");
+                lines.Add(string.Empty);
+            }
+            
             lines.AddRange(Cards.Select(c => $"Q: {c.Question}\nA: {c.Answer}"));
             var content = string.Join("\n\n", lines);
 
             var fileName = $"{SanitizeFileName(ReviewerTitle)}.txt";
             await SaveTextToDeviceAsync(fileName, content);
 
-            await PageHelpers.SafeDisplayAlertAsync(this, "Export", $"Exported '{ReviewerTitle}' to device storage.", "OK");
+            await PageHelpers.SafeDisplayAlertAsync(this, "Export", $"Exported '{ReviewerTitle}' with progress to device storage.", "OK");
             // Go back to Reviewers page after export
             await NavigationService.ToRoot();
         }
@@ -146,5 +156,32 @@ public partial class ExportPage : ContentPage
         Debug.WriteLine($"[ExportPage] Back() -> Previous page");
         await PageHelpers.SafeNavigateAsync(this, async () => await NavigationService.Back(),
             "Could not go back");
+    }
+
+    private string ExportProgressData()
+    {
+        try
+        {
+            // Try to find the reviewer ID by title to get progress data
+            var db = ServiceHelper.GetRequiredService<DatabaseService>();
+            var reviewers = db.GetReviewersAsync().GetAwaiter().GetResult();
+            var reviewer = reviewers.FirstOrDefault(r => r.Title == ReviewerTitle);
+            if (reviewer == null) return string.Empty;
+            
+            // Get progress data from Preferences
+            var progressKey = $"ReviewState_{reviewer.Id}";
+            var progressJson = Preferences.Get(progressKey, string.Empty);
+            
+            if (string.IsNullOrEmpty(progressJson)) return string.Empty;
+            
+            // Encode as base64 to avoid newline issues in file format
+            var bytes = System.Text.Encoding.UTF8.GetBytes(progressJson);
+            return Convert.ToBase64String(bytes);
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[ExportPage] Failed to export progress: {ex.Message}");
+            return string.Empty;
+        }
     }
 }

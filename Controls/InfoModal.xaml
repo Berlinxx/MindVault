@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<toolkit:Popup
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
+    x:Class="mindvault.Controls.InfoModal"
+    CanBeDismissedByTappingOutsideOfPopup="False"
+    Color="#91FFFFFF">
+
+    <!-- Centered modal content -->
+    <Border
+        x:Name="ModalBorder"
+        BackgroundColor="#F5FFFFFF"
+        Stroke="#2C71F0"
+        StrokeThickness="2"
+        HorizontalOptions="Center"
+        VerticalOptions="Center"
+        Padding="24"
+        MinimumWidthRequest="420"
+        MaximumWidthRequest="520">
+            <Grid RowDefinitions="Auto,Auto,Auto" ColumnDefinitions="*">
+                <!-- Title -->
+                <Label
+                    Grid.Row="0"
+                    Text="{Binding TitleText}"
+                    TextColor="Black"
+                    HorizontalTextAlignment="Center"
+                    VerticalTextAlignment="Center"
+                    FontAttributes="Bold"
+                    FontSize="20"
+                    Margin="0,0,0,8" />
+
+                <!-- Message -->
+                <Label
+                    Grid.Row="1"
+                    Text="{Binding MessageText}"
+                    TextColor="#666666"
+                    HorizontalTextAlignment="Center"
+                    VerticalTextAlignment="Center"
+                    LineBreakMode="WordWrap"
+                    Margin="0,0,0,16" />
+
+                <!-- Buttons Row -->
+                <Grid Grid.Row="2" ColumnDefinitions="*,*" ColumnSpacing="12" HorizontalOptions="Center">
+                    <!-- Single button (centered) -->
+                    <Button
+                        x:Name="LeftButton"
+                        Text="{Binding LeftButtonText}"
+                        BackgroundColor="#0D6EFD"
+                        TextColor="White"
+                        CornerRadius="12"
+                        WidthRequest="120"
+                        HeightRequest="45"
+                        Clicked="OnLeftClicked"
+                        Grid.ColumnSpan="2"
+                        HorizontalOptions="Center"
+                        IsVisible="{Binding IsSingleButton}" />
+
+                    <!-- Two-button layout: left button (Cancel - Blue) -->
+                    <Button
+                        x:Name="LeftButtonTwo"
+                        Text="{Binding LeftButtonText}"
+                        BackgroundColor="#0D6EFD"
+                        TextColor="White"
+                        CornerRadius="12"
+                        WidthRequest="120"
+                        HeightRequest="45"
+                        Clicked="OnLeftClicked"
+                        Grid.Column="0"
+                        HorizontalOptions="Center"
+                        IsVisible="{Binding IsTwoButtons}" />
+
+                    <!-- Two-button layout: right button (Action - Blue) -->
+                    <Button
+                        x:Name="RightButtonTwo"
+                        Text="{Binding RightButtonText}"
+                        BackgroundColor="#0D6EFD"
+                        TextColor="White"
+                        CornerRadius="12"
+                        WidthRequest="120"
+                        HeightRequest="45"
+                        Clicked="OnRightClicked"
+                        Grid.Column="1"
+                        HorizontalOptions="Center"
+                        IsVisible="{Binding IsTwoButtons}" />
+                </Grid>
+            </Grid>
+        </Border>
+</toolkit:Popup>

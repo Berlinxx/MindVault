@@ -1,3 +1,5 @@
+using CommunityToolkit.Maui.Views;
+using mindvault.Controls;
 using System.Text;
 using mindvault.Services; // still needed for ServiceHelper/DatabaseService
 using mindvault.Utils;
@@ -15,8 +17,33 @@ namespace mindvault.Pages;
 [QueryProperty(nameof(ReviewerTitle), "title")]
 public partial class SummarizeContentPage : ContentPage
 {
-    public int ReviewerId { get; set; }
-    public string ReviewerTitle { get; set; } = string.Empty;
+    int _reviewerId;
+    public int ReviewerId 
+    { 
+        get => _reviewerId;
+        set 
+        { 
+            _reviewerId = value;
+        }
+    }
+    
+    string _reviewerTitle = string.Empty;
+    public string ReviewerTitle 
+    { 
+        get => _reviewerTitle;
+        set 
+        { 
+            _reviewerTitle = value ?? string.Empty;
+            // Update UI when title is set via query parameter
+            MainThread.BeginInvokeOnMainThread(() =>
+            {
+                if (DeckTitleLabel != null)
+                {
+                    DeckTitleLabel.Text = _reviewerTitle;
+                }
+            });
+        }
+    }
 
     readonly DatabaseService _db = ServiceHelper.GetRequiredService<DatabaseService>();
     readonly FileTextExtractor _extractor = ServiceHelper.GetRequiredService<FileTextExtractor>();
@@ -25,16 +52,22 @@ public partial class SummarizeContentPage : ContentPage
     string _rawContent = string.Empty;
     CancellationTokenSource? _genCts;
     bool _isWindows = DeviceInfo.Platform == DevicePlatform.WinUI;
+    bool _envChecked = false;
 
     // Progress state
     int _totalChunks = 0;
     int _currentChunk = 0;
     DateTime _startTime;
+    double _overlayProgressValue = 0.0;
+    DateTime _lastProgressUpdate = DateTime.MinValue;
+    const int PROGRESS_THROTTLE_MS = 500; // Update UI at most every 500ms to reduce load
 
     public SummarizeContentPage()
     {
         InitializeComponent();
         ContentEditor.TextChanged += OnEditorChanged;
+        // react to track size changes so fills resize correctly
+        OverlayTrack.SizeChanged += (s, e) => SetOverlayProgress(_overlayProgressValue);
         if (!_isWindows)
         {
             GenerateButton.IsVisible = false;
@@ -52,13 +85,83 @@ public partial class SummarizeContentPage : ContentPage
     {
         base.OnAppearing();
         await mindvault.Utils.AnimHelpers.SlideFadeInAsync(Content);
+        
+        if (_isWindows)
+        {
+            // Always recheck environment when page appears
+            _envChecked = false; // Reset flag to force recheck
+            
+            // Quick initial check
+            await QuickCheckEnvironmentAsync();
+            
+            // Also update based on current content
+            if (!string.IsNullOrWhiteSpace(_rawContent))
+            {
+                await UpdateButtonVisibilityAsync();
+            }
+        }
     }
 
     void OnEditorChanged(object? sender, TextChangedEventArgs e)
     {
         _rawContent = e.NewTextValue ?? string.Empty;
         if (_isWindows)
-            GenerateButton.IsVisible = !string.IsNullOrWhiteSpace(_rawContent);
+        {
+            // Update button visibility when content changes
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await UpdateButtonVisibilityAsync();
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"[SummarizeContent] OnEditorChanged error: {ex.Message}");
+                }
+            });
+        }
+    }
+
+    async Task UpdateButtonVisibilityAsync()
+    {
+        try
+        {
+            var bootstrapper = ServiceHelper.GetRequiredService<PythonBootstrapper>();
+            var healthy = await bootstrapper.IsEnvironmentHealthyAsync();
+            var hasContent = !string.IsNullOrWhiteSpace(_rawContent);
+            
+            Debug.WriteLine($"[SummarizeContent] UpdateButtonVisibilityAsync: healthy={healthy}, hasContent={hasContent}");
+            
+            MainThread.BeginInvokeOnMainThread(() =>
+            {
+                GenerateButton.IsVisible = healthy && hasContent;
+                ManualInstallButton.IsVisible = !healthy;
+                
+                // Update status text to guide user
+                if (!healthy)
+                {
+                    StatusLabel.Text = "Setup incomplete. Please use AI Summarize button on previous page.";
+                }
+                else if (!hasContent)
+                {
+                    StatusLabel.Text = "Paste or upload content to generate flashcards";
+                }
+                else
+                {
+                    StatusLabel.Text = "Ready to generate flashcards";
+                }
+            });
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[SummarizeContent] UpdateButtonVisibilityAsync exception: {ex.Message}");
+            MainThread.BeginInvokeOnMainThread(() =>
+            {
+                GenerateButton.IsVisible = false;
+                ManualInstallButton.IsVisible = true;
+                StatusLabel.Text = $"Check failed: {ex.Message}";
+            });
+        }
     }
 
     async void OnBack(object? sender, TappedEventArgs e) => await Navigation.PopAsync();
@@ -120,8 +223,61 @@ public partial class SummarizeContentPage : ContentPage
         }
         catch (Exception ex)
         {
-            await DisplayAlert("File", ex.Message, "OK");
+            this.ShowPopup(new AppModal("File", ex.Message, "OK"));
         }
+    }
+
+    async Task QuickCheckEnvironmentAsync()
+    {
+        try
+        {
+            var bootstrapper = ServiceHelper.GetRequiredService<PythonBootstrapper>();
+            // Fast check only - all heavy lifting done in AddFlashcardsPage
+            bool ready = await bootstrapper.QuickSystemPythonHasLlamaAsync();
+            
+            Debug.WriteLine($"[SummarizeContent] QuickCheckEnvironmentAsync: ready={ready}");
+            
+            if (ready)
+            {
+                // Environment is ready - show generate button
+                MainThread.BeginInvokeOnMainThread(() =>
+                {
+                    ManualInstallButton.IsVisible = false;
+                    GenerateButton.IsVisible = !string.IsNullOrWhiteSpace(_rawContent);
+                    StatusLabel.Text = "Ready to generate flashcards";
+                });
+            }
+            else
+            {
+                // Environment not ready - hide both buttons and show message
+                MainThread.BeginInvokeOnMainThread(() =>
+                {
+                    StatusLabel.Text = "Python + llama required. Use the AI Summarize button on the previous page to install.";
+                    ManualInstallButton.IsVisible = false;
+                    GenerateButton.IsVisible = false;
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[SummarizeContent] QuickCheckEnvironmentAsync exception: {ex.Message}");
+            MainThread.BeginInvokeOnMainThread(() =>
+            {
+                StatusLabel.Text = "Environment check failed: " + ex.Message;
+                ManualInstallButton.IsVisible = false;
+                GenerateButton.IsVisible = false;
+            });
+        }
+    }
+
+    async void OnManualInstall(object? sender, TappedEventArgs e)
+    {
+        // This button should now be hidden - redirect to AddFlashcardsPage for installation
+        await this.ShowPopupAsync(new AppModal(
+            "Installation Required",
+            "Please return to the previous page and use the AI Summarize button to complete the installation.",
+            "OK"
+        ));
     }
 
     async void OnGenerate(object? sender, TappedEventArgs e)
@@ -132,6 +288,14 @@ public partial class SummarizeContentPage : ContentPage
         _genCts = new CancellationTokenSource();
         try
         {
+            var bootstrapper = ServiceHelper.GetRequiredService<PythonBootstrapper>();
+            if (!await bootstrapper.IsEnvironmentHealthyAsync())
+            {
+                StatusLabel.Text = "Python/llama not ready. Use Install button above.";
+                ManualInstallButton.IsVisible = true;
+                GenerateButton.IsVisible = false;
+                return;
+            }
             _startTime = DateTime.UtcNow;
             _totalChunks = 0; _currentChunk = 0;
             ShowLoading(true);
@@ -139,22 +303,34 @@ public partial class SummarizeContentPage : ContentPage
             GenerateButton.IsVisible = false;
             ContentEditor.IsEnabled = false;
 
+            // Ensure UI has time to update before starting heavy processing
+            await Task.Delay(50);
+
             var progress = new Progress<string>(p => UpdateProgressFromPython(p));
-            var cards = await Task.Run(() => _py.GenerateAsync(_rawContent, progress, _genCts.Token));
+            
+            // Run the generation on a background thread to keep UI responsive
+            var cards = await Task.Run(() => _py.GenerateAsync(_rawContent, progress, _genCts.Token), _genCts.Token);
+            
             ContentEditor.IsEnabled = true;
             ShowLoading(false);
+            
             if (cards.Count == 0)
             {
                 StatusLabel.Text = "No term definitions detected.";
                 GenerateButton.IsVisible = true;
                 return;
             }
+            
+            // Process results on UI thread
             App.GeneratedFlashcards.Clear();
             int order = 1;
+            
+            // Batch database operations to reduce UI blocking
+            var flashcardsToAdd = new List<Flashcard>();
             foreach (var c in cards)
             {
                 App.GeneratedFlashcards.Add(c);
-                await _db.AddFlashcardAsync(new Flashcard
+                flashcardsToAdd.Add(new Flashcard
                 {
                     ReviewerId = ReviewerId,
                     Question = c.Question,
@@ -163,6 +339,16 @@ public partial class SummarizeContentPage : ContentPage
                     Order = order++
                 });
             }
+            
+            // Add all flashcards in background
+            await Task.Run(async () =>
+            {
+                foreach (var flashcard in flashcardsToAdd)
+                {
+                    await _db.AddFlashcardAsync(flashcard);
+                }
+            });
+            
             StatusLabel.Text = $"Added {cards.Count} cards.";
             await Task.Delay(300);
             var route = $"///ReviewerEditorPage?id={ReviewerId}&title={Uri.EscapeDataString(ReviewerTitle)}";
@@ -193,16 +379,23 @@ public partial class SummarizeContentPage : ContentPage
     void UpdateProgressFromPython(string msg)
     {
         if (string.IsNullOrWhiteSpace(msg)) return;
+        
+        // Throttle UI updates to prevent blocking
+        var now = DateTime.UtcNow;
+        bool shouldThrottle = (now - _lastProgressUpdate).TotalMilliseconds < PROGRESS_THROTTLE_MS;
+        
         if (msg.StartsWith("::TOTAL::"))
         {
             var tail = msg.Substring("::TOTAL::".Length);
             if (int.TryParse(tail, out _totalChunks))
             {
                 _currentChunk = 0;
-                InlineProgress.IsVisible = _totalChunks > 0;
-                ChunkProgress.Progress = 0;
-                ChunkLabel.Text = $"0 / {_totalChunks}";
-                UpdateOverlayText();
+                _lastProgressUpdate = now;
+                MainThread.BeginInvokeOnMainThread(() =>
+                {
+                    SetOverlayProgress(0);
+                    UpdateOverlayText();
+                });
             }
         }
         else if (msg.StartsWith("::CHUNK::"))
@@ -210,22 +403,41 @@ public partial class SummarizeContentPage : ContentPage
             var parts = msg.Split("::", StringSplitOptions.RemoveEmptyEntries);
             if (parts.Length >= 3 && int.TryParse(parts[1], out var idx) && int.TryParse(parts[2], out var total))
             {
-                _currentChunk = idx; _totalChunks = total;
-                InlineProgress.IsVisible = true;
-                ChunkProgress.Progress = (_totalChunks == 0) ? 0 : Math.Min(1.0, (double)(idx-1) / _totalChunks);
-                ChunkLabel.Text = $"{idx} / {total}";
-                UpdateOverlayText();
+                _currentChunk = idx; 
+                _totalChunks = total;
+                
+                // Only update UI if enough time has passed (throttling)
+                if (!shouldThrottle || idx == total) // Always update on last chunk
+                {
+                    _lastProgressUpdate = now;
+                    var op = (_totalChunks == 0) ? 0 : Math.Min(1.0, (double)idx / _totalChunks);
+                    
+                    // Use BeginInvokeOnMainThread to avoid blocking
+                    MainThread.BeginInvokeOnMainThread(() =>
+                    {
+                        SetOverlayProgress(op);
+                        UpdateOverlayText();
+                    });
+                }
             }
         }
         else if (msg.StartsWith("::DONE::"))
         {
-            ChunkProgress.Progress = 1.0;
-            ChunkLabel.Text = $"Done ({_currentChunk} / {_totalChunks})";
-            OverlayProgressLabel.Text = "Finalizing output...";
+            _lastProgressUpdate = now;
+            // finish overlay
+            MainThread.BeginInvokeOnMainThread(() =>
+            {
+                SetOverlayProgress(1.0);
+                OverlayProgressLabel.Text = "Finalizing output...";
+            });
         }
         else
         {
-            StatusLabel.Text = msg;
+            // Status messages are less frequent, so always update
+            MainThread.BeginInvokeOnMainThread(() =>
+            {
+                StatusLabel.Text = msg;
+            });
         }
     }
 
@@ -243,8 +455,97 @@ public partial class SummarizeContentPage : ContentPage
 
     void ShowLoading(bool show)
     {
-        LoadingOverlay.IsVisible = show;
-        LoadingSpinner.IsRunning = show;
+        // Use BeginInvokeOnMainThread to avoid blocking
+        MainThread.BeginInvokeOnMainThread(() =>
+        {
+            LoadingOverlay.IsVisible = show;
+            
+            if (show)
+            {
+                _overlayProgressValue = 0;
+                _lastProgressUpdate = DateTime.MinValue; // Reset throttle
+                if (OverlayFill != null) OverlayFill.WidthRequest = 0;
+                OverlayProgressLabel.Text = "This might take some time...";
+            }
+            else
+            {
+                // stop shimmer animation
+                try { this.AbortAnimation("ShimmerOverlay"); } catch { }
+            }
+        });
+    }
+
+    // Inline visual replaced with a spinner + value label; old inline progress removed.
+
+    void SetOverlayProgress(double progress)
+    {
+        _overlayProgressValue = progress;
+        
+        // Don't dispatch if already on main thread
+        if (MainThread.IsMainThread)
+        {
+            UpdateProgressUI(progress);
+        }
+        else
+        {
+            MainThread.BeginInvokeOnMainThread(() => UpdateProgressUI(progress));
+        }
+    }
+
+    void UpdateProgressUI(double progress)
+    {
+        if (OverlayTrack == null || OverlayFill == null) return;
+        
+        var trackWidth = Math.Max(0, OverlayTrack.Width - (OverlayTrack.Padding.Left + OverlayTrack.Padding.Right));
+        var target = trackWidth * progress;
+        
+        // Skip animation if width change is very small to reduce UI workload
+        var currentWidth = OverlayFill.WidthRequest;
+        if (Math.Abs(currentWidth - target) < 5 && progress < 1.0) // Increased threshold
+        {
+            return;
+        }
+        
+        // Directly set width instead of animating to reduce UI load
+        OverlayFill.WidthRequest = target;
+        
+        // Disable shimmer animation during processing to prevent UI blocking
+        // if (progress > 0 && progress < 1)
+        //     StartShimmer(OverlayShimmer, OverlayTrack, "ShimmerOverlay");
+        // else
+        //     this.AbortAnimation("ShimmerOverlay");
+    }
+
+    void StartShimmer(VisualElement shimmer, VisualElement track, string animName)
+    {
+        if (shimmer == null || track == null) return;
+        // stop any existing shimmer with the same name
+        try { this.AbortAnimation(animName); } catch { }
+        // ensure shimmer is visible
+        shimmer.IsVisible = true;
+        // compute bounds
+        var trackWidth = Math.Max(0, track.Width - (track is Border b ? (b.Padding.Left + b.Padding.Right) : 0));
+        var shimmerWidth = shimmer.Width <= 0 ? (shimmer is BoxView bv ? bv.WidthRequest : 80) : shimmer.Width;
+        var from = -shimmerWidth;
+        var to = trackWidth + shimmerWidth;
+        var duration = 900u;
+        void loop()
+        {
+            var a = new Animation(p => shimmer.TranslationX = p, from, to, Easing.Linear);
+            a.Commit(this, animName, length: duration, finished: (v, c) =>
+            {
+                // restart while overlay progress not complete
+                if (_overlayProgressValue < 1.0)
+                {
+                    loop();
+                }
+                else
+                {
+                    shimmer.TranslationX = 0;
+                }
+            });
+        }
+        loop();
     }
 
     static string Truncate(string s, int len) => s.Length <= len ? s : s.Substring(0, len).Trim() + "...";

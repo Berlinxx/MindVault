@@ -16,25 +16,48 @@
 		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'">15.0</SupportedOSPlatformVersion>
 		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'maccatalyst'">15.0</SupportedOSPlatformVersion>
 		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">21.0</SupportedOSPlatformVersion>
-		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</SupportedOSPlatformVersion>
-		<TargetPlatformMinVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</TargetPlatformMinVersion>
+		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.19041.0</SupportedOSPlatformVersion>
+		<TargetPlatformMinVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.19041.0</TargetPlatformMinVersion>
 		<ErrorOnDuplicatePublishOutputFiles>false</ErrorOnDuplicatePublishOutputFiles>
 		<MauiEnableLinking>false</MauiEnableLinking>
 	</PropertyGroup>
 
-	<!-- Ensure assemblies are embedded into Android APKs so manual installs run standalone -->
+	<!-- Disable trimming/linking for ALL Android builds to avoid long optimizer step -->
 	<PropertyGroup Condition="'$(TargetFramework)'=='net9.0-android'">
-		<EmbedAssembliesIntoApk>true</EmbedAssembliesIntoApk>
-		<AndroidPackageFormat>apk</AndroidPackageFormat>
+		<PublishTrimmed>false</PublishTrimmed>
+		<AndroidLinkMode>None</AndroidLinkMode>
 	</PropertyGroup>
 
+	<!-- Faster inner-loop for Android Debug: use Fast Deployment and do NOT embed assemblies into APK -->
+	<PropertyGroup Condition="'$(Configuration)'=='Debug' and '$(TargetFramework)'=='net9.0-android'">
+		<EmbedAssembliesIntoApk>false</EmbedAssembliesIntoApk>
+		<AndroidFastDeploymentType>Assemblies</AndroidFastDeploymentType>
+		<AndroidPackageFormat>apk</AndroidPackageFormat>
+		<UseInterpreter>true</UseInterpreter>
+		<!-- Build only common ABIs in Debug to reduce package size; add/remove as needed for your device/emulator -->
+		<AndroidSupportedAbis>arm64-v8a;x86_64</AndroidSupportedAbis>
+		<RunAOTCompilation>false</RunAOTCompilation>
+	</PropertyGroup>
+
+	<!-- Release/other configs: keep standalone APK behavior, but disable trimming & AOT to speed builds -->
+	<PropertyGroup Condition="'$(TargetFramework)'=='net9.0-android' and '$(Configuration)'=='Release'">
+		<EmbedAssembliesIntoApk>true</EmbedAssembliesIntoApk>
+		<AndroidPackageFormat>apk</AndroidPackageFormat>
+		<PublishTrimmed>false</PublishTrimmed>
+		<AndroidLinkMode>None</AndroidLinkMode>
+		<RunAOTCompilation>false</RunAOTCompilation>
+		<AndroidEnableProfiledAot>false</AndroidEnableProfiledAot>
+		<!-- Optionally narrow ABIs in Release during development to speed packaging -->
+		<AndroidSupportedAbis>arm64-v8a;x86_64</AndroidSupportedAbis>
+	</PropertyGroup>
+
+	<!-- Keep multi-targeting for all configurations so Windows builds are available.
+	     If you want Android-only fast inner-loop, use IDE launch profiles or an
+	     explicit build command that targets only Android. -->
+
 	<ItemGroup>
-		<!-- Use PNG app icon and provide Android adaptive icon layers. -->
-		<!-- Foreground: an extracted transparent foreground PNG for the logo -->
-		<!-- Background: a solid color or background PNG used behind the foreground on supported launchers -->
-		<MauiIcon Include="Resources\AppIcon\app_icon.png"
-		          AndroidAdaptiveIconForeground="Resources\AppIcon\app_icon_foreground.png"
-		          AndroidAdaptiveIconBackground="Resources\AppIcon\app_icon_background.png" />
+		<!-- Use PNG app icon for all platforms (same icon for Windows and Android) -->
+		<MauiIcon Include="Resources\AppIcon\app_icon.png" />
 		<MauiSplashScreen Include="Resources\Splash\mindvault_logo.jpg" Color="#1A86D9" BaseSize="256,256" />
 		<MauiImage Include="Resources\Images\*" />
 		<MauiImage Update="Resources\Images\dotnet_bot.png" Resize="True" BaseSize="300,185" />
@@ -43,7 +66,7 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<PackageReference Include="CommunityToolkit.Maui" Version="12.2.0" />
+		<PackageReference Include="CommunityToolkit.Maui" Version="9.0.0" />
 		<PackageReference Include="CommunityToolkit.Mvvm" Version="8.3.2" />
 		<PackageReference Include="Microsoft.Maui.Controls" Version="9.0.111" />
 		<PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="9.0.5" />
@@ -56,6 +79,12 @@
 
 	<!-- Use Update so we do NOT duplicate XAML resources (fixes CS1508). -->
 	<ItemGroup>
+	  <MauiXaml Update="Controls\InfoModal.xaml">
+	    <Generator>MSBuild:Compile</Generator>
+	  </MauiXaml>
+	  <MauiXaml Update="Controls\ShortcutsModal.xaml">
+	    <Generator>MSBuild:Compile</Generator>
+	  </MauiXaml>
 	  <MauiXaml Update="Pages\AddFlashcardsPage.xaml" />
 	  <MauiXaml Update="Pages\GameOverPage.xaml" />
 	  <MauiXaml Update="Pages\ProfileSettingsPage.xaml" />
@@ -75,13 +104,39 @@
 	  <MauiXaml Update="Pages\ReviewerSettingsPage.xaml" />
 	</ItemGroup>
 
+	<!-- AI-related files: Windows only (Android/iOS/macOS don't support Python AI) -->
 	<ItemGroup>
 		<Content Include="Models\mindvault_qwen2_0.5b_q4_k_m.gguf" Condition="$(TargetFramework.Contains('windows'))">
 			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
 		</Content>
-		<Content Include="Scripts\flashcard_ai.py">
+		<Content Include="Scripts\flashcard_ai.py" Condition="$(TargetFramework.Contains('windows'))">
 			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
 		</Content>
+		<!-- Bundle llama-cpp-python wheel for Windows offline installation -->
+		<Content Include="Wheels\llama_cpp_python-*.whl" Condition="$(TargetFramework.Contains('windows'))">
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+		</Content>
+		<!-- Bundle complete Python311 distribution with all dependencies -->
+		<Content Include="Python311\**\*" Condition="$(TargetFramework.Contains('windows'))" Exclude="Python311\**\*.cs">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+			<Link>Python311\%(RecursiveDir)%(Filename)%(Extension)</Link>
+		</Content>
+	</ItemGroup>
+
+	<ItemGroup>
+	  <AndroidResource Remove="NewFolder1\**" />
+	  <Compile Remove="NewFolder1\**" />
+	  <EmbeddedResource Remove="NewFolder1\**" />
+	  <MauiCss Remove="NewFolder1\**" />
+	  <MauiXaml Remove="NewFolder1\**" />
+	  <None Remove="NewFolder1\**" />
+	  <!-- Exclude Python311 folder from compilation -->
+	  <Compile Remove="Python311\**" />
+	  <None Include="Python311\**" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <Folder Include="python311\" />
 	</ItemGroup>
 
 </Project>

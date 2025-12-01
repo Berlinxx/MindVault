@@ -2,6 +2,8 @@ using System.Collections.ObjectModel;
 using System.Linq;
 using System.Text.RegularExpressions;
 using mindvault.Services;
+using mindvault.Controls;
+using CommunityToolkit.Maui.Views;
 
 namespace mindvault.Pages;
 
@@ -60,13 +62,13 @@ public partial class ProfileSettingsPage : ContentPage
         var name = UsernameEntry.Text?.Trim() ?? string.Empty;
         if (!IsValidUsername(name))
         {
-            await DisplayAlert("Invalid Name", "Please enter a valid username.", "OK");
+            await this.ShowPopupAsync(new AppModal("Invalid Name", "Please enter a valid username.", "OK"));
             return;
         }
         ProfileState.Name = name;
         ProfileState.Avatar = SelectedAvatar;
         ProfileState.Gender = _selectedGender;
-        await DisplayAlert("Saved", "Profile updated.", "OK");
+        await this.ShowPopupAsync(new AppModal("Saved", "Profile updated.", "OK"));
         await Navigation.PopAsync();
     }
 }

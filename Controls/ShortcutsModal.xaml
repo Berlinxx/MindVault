@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<toolkit:Popup
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
+    x:Class="mindvault.Controls.ShortcutsModal"
+    CanBeDismissedByTappingOutsideOfPopup="True"
+    Color="#91FFFFFF">
+
+    <!-- Centered modal content -->
+    <Border
+        x:Name="ModalBorder"
+        BackgroundColor="White"
+        Stroke="#31B6D8"
+        StrokeThickness="2"
+        HorizontalOptions="Center"
+        VerticalOptions="Center"
+        Padding="24"
+        MinimumWidthRequest="420"
+        MaximumWidthRequest="520"
+        StrokeShape="RoundRectangle 16">
+        <Grid RowDefinitions="Auto,Auto,Auto" ColumnDefinitions="*">
+            <!-- Title with keyboard icon -->
+            <HorizontalStackLayout Grid.Row="0" HorizontalOptions="Center" Spacing="8" Margin="0,0,0,16">
+                <Label
+                    Text="&#xF11C;"
+                    FontFamily="FontAwesome6FreeSolid"
+                    FontSize="20"
+                    TextColor="#31B6D8"
+                    VerticalOptions="Center" />
+                <Label
+                    Text="Keyboard Shortcuts"
+                    TextColor="#111318"
+                    HorizontalTextAlignment="Center"
+                    VerticalTextAlignment="Center"
+                    FontAttributes="Bold"
+                    FontSize="20" />
+            </HorizontalStackLayout>
+
+            <!-- Shortcuts List -->
+            <VerticalStackLayout Grid.Row="1" Spacing="12" Margin="0,0,0,20">
+                
+                <!-- Save Card and Create New -->
+                <Grid ColumnDefinitions="Auto,*" ColumnSpacing="16">
+                    <Border Grid.Column="0" BackgroundColor="#E7F6FB" Padding="8,4" StrokeShape="RoundRectangle 6" StrokeThickness="0">
+                        <Label Text="Ctrl + S" FontFamily="Consolas" FontSize="13" TextColor="#0B57C1" FontAttributes="Bold"/>
+                    </Border>
+                    <Label Grid.Column="1" Text="Save card and create new" TextColor="#5A6573" FontSize="14" VerticalOptions="Center"/>
+                </Grid>
+
+                <!-- Add New Card -->
+                <Grid ColumnDefinitions="Auto,*" ColumnSpacing="16">
+                    <Border Grid.Column="0" BackgroundColor="#E7F6FB" Padding="8,4" StrokeShape="RoundRectangle 6" StrokeThickness="0">
+                        <Label Text="Ctrl + N" FontFamily="Consolas" FontSize="13" TextColor="#0B57C1" FontAttributes="Bold"/>
+                    </Border>
+                    <Label Grid.Column="1" Text="Add new card" TextColor="#5A6573" FontSize="14" VerticalOptions="Center"/>
+                </Grid>
+
+                <!-- Delete Card -->
+                <Grid ColumnDefinitions="Auto,*" ColumnSpacing="16">
+                    <Border Grid.Column="0" BackgroundColor="#E7F6FB" Padding="8,4" StrokeShape="RoundRectangle 6" StrokeThickness="0">
+                        <Label Text="Ctrl + D" FontFamily="Consolas" FontSize="13" TextColor="#0B57C1" FontAttributes="Bold"/>
+                    </Border>
+                    <Label Grid.Column="1" Text="Delete current card" TextColor="#5A6573" FontSize="14" VerticalOptions="Center"/>
+                </Grid>
+
+                <!-- Save and Exit -->
+                <Grid ColumnDefinitions="Auto,*" ColumnSpacing="16">
+                    <Border Grid.Column="0" BackgroundColor="#E7F6FB" Padding="8,4" StrokeShape="RoundRectangle 6" StrokeThickness="0">
+                        <Label Text="Ctrl + Enter" FontFamily="Consolas" FontSize="13" TextColor="#0B57C1" FontAttributes="Bold"/>
+                    </Border>
+                    <Label Grid.Column="1" Text="Save and exit" TextColor="#5A6573" FontSize="14" VerticalOptions="Center"/>
+                </Grid>
+
+                <!-- Edit Title -->
+                <Grid ColumnDefinitions="Auto,*" ColumnSpacing="16">
+                    <Border Grid.Column="0" BackgroundColor="#E7F6FB" Padding="8,4" StrokeShape="RoundRectangle 6" StrokeThickness="0">
+                        <Label Text="Ctrl + E" FontFamily="Consolas" FontSize="13" TextColor="#0B57C1" FontAttributes="Bold"/>
+                    </Border>
+                    <Label Grid.Column="1" Text="Edit deck title" TextColor="#5A6573" FontSize="14" VerticalOptions="Center"/>
+                </Grid>
+
+                <!-- Show Shortcuts -->
+                <Grid ColumnDefinitions="Auto,*" ColumnSpacing="16">
+                    <Border Grid.Column="0" BackgroundColor="#E7F6FB" Padding="8,4" StrokeShape="RoundRectangle 6" StrokeThickness="0">
+                        <Label Text="Ctrl + H" FontFamily="Consolas" FontSize="13" TextColor="#0B57C1" FontAttributes="Bold"/>
+                    </Border>
+                    <Label Grid.Column="1" Text="Show shortcuts" TextColor="#5A6573" FontSize="14" VerticalOptions="Center"/>
+                </Grid>
+
+                <!-- Cancel/Close -->
+                <Grid ColumnDefinitions="Auto,*" ColumnSpacing="16">
+                    <Border Grid.Column="0" BackgroundColor="#E7F6FB" Padding="8,4" StrokeShape="RoundRectangle 6" StrokeThickness="0">
+                        <Label Text="Esc" FontFamily="Consolas" FontSize="13" TextColor="#0B57C1" FontAttributes="Bold"/>
+                    </Border>
+                    <Label Grid.Column="1" Text="Cancel/Close dialog" TextColor="#5A6573" FontSize="14" VerticalOptions="Center"/>
+                </Grid>
+
+            </VerticalStackLayout>
+
+            <!-- Close Button -->
+            <Button
+                Grid.Row="2"
+                Text="Got it!"
+                BackgroundColor="#31B6D8"
+                TextColor="White"
+                CornerRadius="12"
+                WidthRequest="120"
+                HeightRequest="45"
+                Clicked="OnCloseClicked"
+                HorizontalOptions="Center" />
+        </Grid>
+    </Border>
+</toolkit:Popup>

@@ -9,6 +9,8 @@ using Microsoft.Maui.Devices;
 using Microsoft.Maui.Controls; // ensure ContentPage & InitializeComponent
 using mindvault.Services;
 using mindvault.Utils;
+using mindvault.Controls;
+using CommunityToolkit.Maui.Views;
 
 namespace mindvault.Pages;
 
@@ -76,6 +78,11 @@ public partial class ReviewersPage : ContentPage
 
     private List<ReviewerCard> _baseline = new();
     readonly DatabaseService _db;
+    readonly GlobalDeckPreloadService _preloader = ServiceHelper.GetRequiredService<GlobalDeckPreloadService>();
+    
+    // Guards to prevent rapid clicking
+    private bool _isExporting = false;
+    private bool _isImporting = false;
 
     public ReviewersPage()
     {
@@ -85,29 +92,113 @@ public partial class ReviewersPage : ContentPage
         _db = ServiceHelper.GetRequiredService<DatabaseService>();
     }
 
+    private void OnDropdownTapped(object? sender, EventArgs e)
+    {
+        if (DropdownList != null)
+        {
+            DropdownList.IsVisible = !DropdownList.IsVisible;
+        }
+    }
+
+    private void OnDropdownItemTapped(object? sender, TappedEventArgs e)
+    {
+        if (e.Parameter is string selectedOption)
+        {
+            SelectedSort = selectedOption;
+            if (DropdownList != null)
+            {
+                DropdownList.IsVisible = false;
+            }
+        }
+    }
+
+    protected override bool OnBackButtonPressed()
+    {
+        // Handle Android back button to go to previous page instead of home
+        MainThread.BeginInvokeOnMainThread(async () =>
+        {
+            if (Navigation.NavigationStack.Count > 1)
+            {
+                await Navigation.PopAsync();
+            }
+            else
+            {
+                // If this is the root page, go to HomePage
+                await Shell.Current.GoToAsync("///HomePage");
+            }
+        });
+        return true; // Prevent default back button behavior
+    }
+
     protected override void OnAppearing()
     {
         base.OnAppearing();
-        _ = StartEntryAnimationAsync();
-        var cache = ServiceHelper.GetRequiredService<ReviewersCacheService>();
+        _ = ShowLoadingAsync();
+
+        // Build list after ensuring RAM decks are ready
         _ = Task.Run(async () =>
         {
-            await cache.RefreshAsync();
-            var list = cache.Items.Select(item => new ReviewerCard
+            try
             {
-                Id = item.Id,
-                Title = item.Title,
-                Questions = item.Questions,
-                ProgressRatio = item.ProgressRatio,
-                ProgressLabel = item.ProgressLabel,
-                Due = item.Due,
-                CreatedUtc = item.CreatedUtc,
-                LastPlayedUtc = item.LastPlayedUtc
-            }).ToList();
-            _baseline = list;
-            MainThread.BeginInvokeOnMainThread(ApplyLoadedData);
+                // Force refresh from database to pick up newly imported decks
+                await _preloader.PreloadAllAsync(forceReload: true);
+
+                var reviewers = await _db.GetReviewersAsync();
+                var statsList = await _db.GetReviewerStatsAsync();
+                var statsMap = statsList.ToDictionary(s => s.ReviewerId);
+
+                var list = new List<ReviewerCard>();
+                foreach (var r in reviewers)
+                {
+                    var total = _preloader.Decks.TryGetValue(r.Id, out var cards) ? cards.Count : 0;
+                    statsMap.TryGetValue(r.Id, out var stats);
+                    int learnedRaw = stats?.Learned ?? 0;
+                    double progressRatio = (total == 0) ? 0 : (double)learnedRaw / total;
+                    list.Add(new ReviewerCard
+                    {
+                        Id = r.Id,
+                        Title = r.Title,
+                        Questions = total,
+                        ProgressRatio = progressRatio,
+                        ProgressLabel = "Learned",
+                        Due = 0,
+                        CreatedUtc = r.CreatedUtc,
+                        LastPlayedUtc = null
+                    });
+                }
+                _baseline = list;
+            }
+            catch { }
+            finally
+            {
+                MainThread.BeginInvokeOnMainThread(async () => await ApplyLoadedDataAsync());
+            }
         });
+
         WireOnce();
+    }
+
+    private async Task ShowLoadingAsync()
+    {
+        IsLoadingReviewers = true;
+        OnPropertyChanged(nameof(IsLoadingReviewers));
+        var overlay = this.FindByName<Grid>("LoadingOverlay");
+        if (overlay != null)
+        {
+            overlay.Opacity = 0;
+            overlay.IsVisible = true;
+            await overlay.FadeTo(1, 250, Easing.CubicInOut);
+        }
+    }
+
+    private async Task HideLoadingAsync()
+    {
+        var overlay = this.FindByName<Grid>("LoadingOverlay");
+        if (overlay == null) { IsLoadingReviewers = false; OnPropertyChanged(nameof(IsLoadingReviewers)); return; }
+        await overlay.FadeTo(0, 300, Easing.CubicInOut);
+        overlay.IsVisible = false;
+        IsLoadingReviewers = false;
+        OnPropertyChanged(nameof(IsLoadingReviewers));
     }
 
     async Task StartEntryAnimationAsync()
@@ -120,42 +211,23 @@ public partial class ReviewersPage : ContentPage
         catch { }
     }
 
-    async Task LoadFromDbAsync()
-    {
-        var rows = await _db.GetReviewersAsync();
-        var statsList = await _db.GetReviewerStatsAsync();
-        var statsMap = statsList.ToDictionary(s => s.ReviewerId);
-        var newBaseline = new List<ReviewerCard>();
-        foreach (var r in rows)
-        {
-            statsMap.TryGetValue(r.Id, out var stats);
-            int total = stats?.Total ?? 0;
-            int learnedRaw = stats?.Learned ?? 0;
-            var lastPlayed = Preferences.Get(GetLastPlayedKey(r.Id), DateTime.MinValue);
-            double progressRatio = (total == 0) ? 0 : (double)learnedRaw / total;
-            newBaseline.Add(new ReviewerCard
-            {
-                Id = r.Id,
-                Title = r.Title,
-                Questions = total,
-                ProgressRatio = progressRatio,
-                ProgressLabel = "Learned",
-                Due = 0,
-                CreatedUtc = r.CreatedUtc,
-                LastPlayedUtc = lastPlayed == DateTime.MinValue ? null : lastPlayed
-            });
-        }
-        _baseline = newBaseline;
-    }
-
-    void ApplyLoadedData()
+    private async Task ApplyLoadedDataAsync()
     {
         Reviewers.ReplaceRange(_baseline);
         ApplySort();
         IsLoaded = true;
-        IsLoadingReviewers = false;
         OnPropertyChanged(nameof(IsLoaded));
-        OnPropertyChanged(nameof(IsLoadingReviewers));
+
+        await HideLoadingAsync();
+
+        try { await AnimHelpers.SlideFadeInAsync(this.FindByName<Grid>("RootGrid") ?? (VisualElement)Content); } catch { }
+
+        var listView = this.FindByName<CollectionView>("ReviewerListView");
+        if (listView != null)
+        {
+            listView.Opacity = 0;
+            await listView.FadeTo(1, 350, Easing.CubicInOut);
+        }
     }
 
     static string GetLastPlayedKey(int reviewerId) => $"reviewer_last_played_{reviewerId}";
@@ -202,15 +274,16 @@ public partial class ReviewersPage : ContentPage
     {
         if (sender is Border border && border.BindingContext is ReviewerCard reviewer)
         {
-            bool confirmed = await PageHelpers.SafeDisplayAlertAsync(this, "Delete Reviewer",
+            var confirmResult = await this.ShowPopupAsync(new AppModal("Delete Reviewer",
                 $"Are you sure you want to delete '{reviewer.Title}'?",
-                "Delete", "Cancel");
+                "Delete", "Cancel"));
+            bool confirmed = confirmResult is bool b && b;
             if (confirmed)
             {
                 await _db.DeleteReviewerCascadeAsync(reviewer.Id);
                 _baseline.RemoveAll(x => x.Id == reviewer.Id);
                 ApplySort();
-                await PageHelpers.SafeDisplayAlertAsync(this, "Deleted", $"'{reviewer.Title}' has been removed.", "OK");
+                await this.ShowPopupAsync(new AppModal("Deleted", $"'{reviewer.Title}' has been removed.", "OK"));
             }
         }
     }
@@ -220,17 +293,30 @@ public partial class ReviewersPage : ContentPage
         if (sender is Border border && border.BindingContext is ReviewerCard reviewer)
         {
             Debug.WriteLine($"[ReviewersPage] OpenCourse() -> CourseReviewPage");
-            await Navigator.PushAsync(new CourseReviewPage(reviewer.Id, reviewer.Title), Navigation);
+            await PageHelpers.SafeNavigateAsync(this, async () =>
+            {
+                await Navigator.PushAsync(new CourseReviewPage(reviewer.Id, reviewer.Title), Navigation);
+            }, "Could not open course");
         }
     }
 
     private async void OnEditTapped(object? sender, TappedEventArgs e)
     {
-        if (sender is not Element el || el.BindingContext is not ReviewerCard reviewer) return;
+        if (sender is not Element el || el.BindingContext is not ReviewerCard reviewer)
+            return;
+
         Debug.WriteLine($"[ReviewersPage] OpenEditor() -> ReviewerEditorPage (Id={reviewer.Id}, Title={reviewer.Title})");
+
+        // Show spinner immediately
+        await ShowLoadingAsync();
+
         var route = $"///{nameof(ReviewerEditorPage)}?id={reviewer.Id}&title={Uri.EscapeDataString(reviewer.Title)}";
-        await PageHelpers.SafeNavigateAsync(this, async () => await Shell.Current.GoToAsync(route),
-            "Could not open editor");
+
+        await PageHelpers.SafeNavigateAsync(this, async () =>
+        {
+            await Shell.Current.GoToAsync(route);
+        }, "Could not open editor");
+        // Do NOT hide spinner here; it will hide when returning to this page.
     }
 
     private void OnSearchTapped(object? sender, TappedEventArgs e)
@@ -265,23 +351,47 @@ public partial class ReviewersPage : ContentPage
 
     private async void OnExportTapped(object? sender, EventArgs e)
     {
-        if (sender is Border border && border.BindingContext is ReviewerCard reviewer)
+        // Prevent multiple simultaneous exports
+        if (_isExporting) return;
+        _isExporting = true;
+        
+        try
         {
-            try
+            if (sender is Border border && border.BindingContext is ReviewerCard reviewer)
             {
-                var cards = await _db.GetFlashcardsAsync(reviewer.Id);
-                var list = cards.Select(c => (c.Question, c.Answer)).ToList();
-                await Navigator.PushAsync(new ExportPage(reviewer.Title, list), Navigation);
+                try
+                {
+                    var cards = await _db.GetFlashcardsAsync(reviewer.Id);
+                    var list = cards.Select(c => (c.Question, c.Answer)).ToList();
+                    await Navigator.PushAsync(new ExportPage(reviewer.Title, list), Navigation);
+                }
+                catch (Exception ex)
+                {
+                    await PageHelpers.SafeDisplayAlertAsync(this, "Export", ex.Message, "OK");
+                }
             }
-            catch (Exception ex)
-            {
-                await PageHelpers.SafeDisplayAlertAsync(this, "Export", ex.Message, "OK");
-            }
+        }
+        finally
+        {
+            // Add small delay before allowing next export
+            await Task.Delay(300);
+            _isExporting = false;
         }
     }
 
     private async void OnImportTapped(object? sender, EventArgs e)
     {
+        // Prevent multiple simultaneous imports
+        if (_isImporting) return;
+        _isImporting = true;
+        
+        // Provide visual feedback
+        if (ImportPill != null)
+        {
+            ImportPill.Opacity = 0.5;
+            ImportPill.IsEnabled = false;
+        }
+        
         try
         {
             var fileTypes = new FilePickerFileType(new Dictionary<DevicePlatform, IEnumerable<string>>
@@ -297,7 +407,9 @@ public partial class ReviewersPage : ContentPage
                 PickerTitle = "Select .txt export file",
                 FileTypes = fileTypes
             });
-            if (pick is null) return;
+            
+            if (pick is null) return; // User cancelled
+            
             if (!string.Equals(Path.GetExtension(pick.FileName), ".txt", System.StringComparison.OrdinalIgnoreCase))
             {
                 await PageHelpers.SafeDisplayAlertAsync(this, "Import", "Only .txt files are supported.", "OK");
@@ -309,30 +421,64 @@ public partial class ReviewersPage : ContentPage
             using (var reader = new StreamReader(stream))
                 content = await reader.ReadToEndAsync();
 
-            var (title, cards) = ParseExport(content);
+            var (title, cards, progressData) = ParseExport(content);
             if (cards.Count == 0)
             {
                 await PageHelpers.SafeDisplayAlertAsync(this, "Import", "No cards found in file.", "OK");
                 return;
             }
 
-            await Navigator.PushAsync(new ImportPage(title, cards), Navigation);
+            var importPage = new ImportPage(title, cards);
+            if (!string.IsNullOrEmpty(progressData))
+            {
+                importPage.SetProgressData(progressData);
+            }
+            await Navigator.PushAsync(importPage, Navigation);
         }
         catch (Exception ex)
         {
             await PageHelpers.SafeDisplayAlertAsync(this, "Import Failed", ex.Message, "OK");
         }
+        finally
+        {
+            // Restore visual state
+            if (ImportPill != null)
+            {
+                ImportPill.Opacity = 1.0;
+                ImportPill.IsEnabled = true;
+            }
+            
+            // Add small delay before allowing next import
+            await Task.Delay(500);
+            _isImporting = false;
+        }
     }
 
-    private (string Title, List<(string Q, string A)> Cards) ParseExport(string content)
+    private (string Title, List<(string Q, string A)> Cards, string ProgressData) ParseExport(string content)
     {
         var lines = content.Replace("\r", string.Empty).Split('\n');
         string title = lines.FirstOrDefault(l => l.StartsWith("Reviewer:", StringComparison.OrdinalIgnoreCase))?.Substring(9).Trim() ?? "Imported Reviewer";
+        string progressData = string.Empty;
+        
+        // Check for progress data
+        var progressLine = lines.FirstOrDefault(l => l.StartsWith("ProgressData:", StringComparison.OrdinalIgnoreCase));
+        if (progressLine != null)
+        {
+            progressData = progressLine.Substring(13).Trim();
+        }
+        
         var cards = new List<(string Q, string A)>();
         string? q = null;
         foreach (var raw in lines)
         {
             var line = raw.Trim();
+            // Skip metadata lines
+            if (line.StartsWith("Reviewer:", StringComparison.OrdinalIgnoreCase) ||
+                line.StartsWith("Questions:", StringComparison.OrdinalIgnoreCase) ||
+                line.StartsWith("Progress:", StringComparison.OrdinalIgnoreCase) ||
+                line.StartsWith("ProgressData:", StringComparison.OrdinalIgnoreCase))
+                continue;
+                
             if (line.StartsWith("Q:", StringComparison.OrdinalIgnoreCase))
             {
                 if (!string.IsNullOrWhiteSpace(q)) { cards.Add((q, string.Empty)); }
@@ -349,6 +495,6 @@ public partial class ReviewersPage : ContentPage
             }
         }
         if (!string.IsNullOrWhiteSpace(q)) cards.Add((q, string.Empty));
-        return (title, cards);
+        return (title, cards, progressData);
     }
 }

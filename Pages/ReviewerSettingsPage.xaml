@@ -69,12 +69,17 @@
         <controls:HamburgerButton x:Name="HamburgerButton" />
         <HorizontalStackLayout Grid.Column="1" Spacing="6" VerticalOptions="Center">
           <Label Text="{Binding ReviewerTitle}" FontAttributes="Bold" FontSize="18"
-                 TextColor="{StaticResource TextPrimary}" />
+                 TextColor="{StaticResource TextPrimary}"
+                 SemanticProperties.HeadingLevel="Level1"
+                 SemanticProperties.Description="Reviewer settings page heading" />
         </HorizontalStackLayout>
         <!-- X Close -->
         <Border Grid.Column="2" WidthRequest="34" HeightRequest="34"
-                Stroke="#E8EDF2" StrokeThickness="1" StrokeShape="Ellipse" BackgroundColor="White">
-          <Label Text="&#xF00D;" FontFamily="FAS" FontSize="14" TextColor="{StaticResource TextPrimary}"
+                Stroke="#E8EDF2" StrokeThickness="1" StrokeShape="Ellipse" BackgroundColor="White"
+                ToolTipProperties.Text="Close settings and return"
+                SemanticProperties.Description="Close button"
+                SemanticProperties.Hint="Closes settings and returns to review">
+          <Label Text="&#xF00D;" FontFamily="FontAwesome6FreeSolid" FontSize="14" TextColor="{StaticResource TextPrimary}"
                  HorizontalOptions="Center" VerticalOptions="Center"/>
           <Border.GestureRecognizers>
             <TapGestureRecognizer Tapped="OnCloseTapped"/>
@@ -92,7 +97,9 @@
 
             <!-- Grey top bar -->
             <Border BackgroundColor="{StaticResource GreyBar}" StrokeThickness="0"
-                    StrokeShape="RoundRectangle 10" HeightRequest="24">
+                    StrokeShape="RoundRectangle 10" HeightRequest="24"
+                    SemanticProperties.Description="Close settings button"
+                    SemanticProperties.Hint="Tap to close settings">
               <Label Text="X CLOSE SETTINGS" FontAttributes="Bold" FontSize="12"
                      TextColor="#333" HorizontalTextAlignment="Center" VerticalTextAlignment="Center"/>
               <Border.GestureRecognizers>
@@ -107,11 +114,14 @@
                    TextColor="{StaticResource TextPrimary}" HorizontalTextAlignment="Center"/>
 
             <!-- Mind Vault Default -->
-            <Border x:Name="DefaultTile" Style="{StaticResource ModeTile}" BackgroundColor="{StaticResource Primary}">
+            <Border x:Name="DefaultTile" Style="{StaticResource ModeTile}" BackgroundColor="{StaticResource Primary}"
+                    ToolTipProperties.Text="Select Mind Vault default algorithm"
+                    SemanticProperties.Description="Mind Vault default mode button"
+                    SemanticProperties.Hint="Selects the default learning algorithm suited for regular learning speed">
               <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
                 <Border BackgroundColor="#F3F6FF" StrokeThickness="0" StrokeShape="Ellipse"
                         WidthRequest="54" HeightRequest="54">
-                  <Label Text="&#xF0E7;" FontFamily="FAS" FontSize="20"
+                  <Label Text="&#xF0E7;" FontFamily="FontAwesome6FreeSolid" FontSize="20"
                          HorizontalOptions="Center" VerticalOptions="Center"
                          TextColor="{StaticResource PrimaryDark}"/>
                 </Border>
@@ -126,9 +136,12 @@
                    FontSize="12" TextColor="{StaticResource TextSecondary}" />
 
             <!-- Exam Cram Mode -->
-            <Border x:Name="ExamTile" Style="{StaticResource ModeTile}" BackgroundColor="#E2E2E2">
+            <Border x:Name="ExamTile" Style="{StaticResource ModeTile}" BackgroundColor="#E2E2E2"
+                    ToolTipProperties.Text="Select Exam Cram Mode"
+                    SemanticProperties.Description="Exam cram mode button"
+                    SemanticProperties.Hint="Selects exam cram mode for rapid learning with frequent term repetition">
               <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
-                <Label Text="&#xF5BD;" FontFamily="FAS" FontSize="24" TextColor="#666"
+                <Label Text="&#xF5BD;" FontFamily="FontAwesome6FreeSolid" FontSize="24" TextColor="#666"
                        VerticalOptions="Center"/>
                 <Label x:Name="ExamTileLabel" Grid.Column="1" Text="EXAM CRAM MODE" FontSize="16"
                        FontAttributes="Bold" TextColor="#555" VerticalOptions="Center"/>
@@ -144,34 +157,47 @@
 
             <!-- Questions per round -->
             <Border BackgroundColor="{StaticResource Primary}" StrokeThickness="0"
-                    StrokeShape="RoundRectangle 12" Padding="12,8">
+                    StrokeShape="RoundRectangle 12" Padding="12,8"
+                    SemanticProperties.Description="Questions per round section">
               <Label Text="Questions per round" TextColor="White" FontAttributes="Bold" />
             </Border>
 
             <HorizontalStackLayout Spacing="10" HorizontalOptions="Center" Margin="0,4,0,0">
               <!-- 10 -->
-              <Border x:Name="Round10Chip" Style="{StaticResource Chip}">
+              <Border x:Name="Round10Chip" Style="{StaticResource Chip}"
+                      ToolTipProperties.Text="10 questions per round"
+                      SemanticProperties.Description="10 questions option"
+                      SemanticProperties.Hint="Sets 10 questions per review round">
                 <Label Text="10" TextColor="{StaticResource TextPrimary}" FontAttributes="Bold" />
                 <Border.GestureRecognizers>
                   <TapGestureRecognizer Tapped="OnRoundSizeTapped" CommandParameter="10"/>
                 </Border.GestureRecognizers>
               </Border>
               <!-- 20 -->
-              <Border x:Name="Round20Chip" Style="{StaticResource Chip}">
+              <Border x:Name="Round20Chip" Style="{StaticResource Chip}"
+                      ToolTipProperties.Text="20 questions per round"
+                      SemanticProperties.Description="20 questions option"
+                      SemanticProperties.Hint="Sets 20 questions per review round">
                 <Label Text="20" TextColor="{StaticResource TextPrimary}" FontAttributes="Bold" />
                 <Border.GestureRecognizers>
                   <TapGestureRecognizer Tapped="OnRoundSizeTapped" CommandParameter="20"/>
                 </Border.GestureRecognizers>
               </Border>
               <!-- 30 -->
-              <Border x:Name="Round30Chip" Style="{StaticResource Chip}">
+              <Border x:Name="Round30Chip" Style="{StaticResource Chip}"
+                      ToolTipProperties.Text="30 questions per round"
+                      SemanticProperties.Description="30 questions option"
+                      SemanticProperties.Hint="Sets 30 questions per review round">
                 <Label Text="30" TextColor="{StaticResource TextPrimary}" FontAttributes="Bold" />
                 <Border.GestureRecognizers>
                   <TapGestureRecognizer Tapped="OnRoundSizeTapped" CommandParameter="30"/>
                 </Border.GestureRecognizers>
               </Border>
               <!-- 40 -->
-              <Border x:Name="Round40Chip" Style="{StaticResource Chip}">
+              <Border x:Name="Round40Chip" Style="{StaticResource Chip}"
+                      ToolTipProperties.Text="40 questions per round"
+                      SemanticProperties.Description="40 questions option"
+                      SemanticProperties.Hint="Sets 40 questions per review round">
                 <Label Text="40" TextColor="{StaticResource TextPrimary}" FontAttributes="Bold" />
                 <Border.GestureRecognizers>
                   <TapGestureRecognizer Tapped="OnRoundSizeTapped" CommandParameter="40"/>
@@ -180,7 +206,10 @@
             </HorizontalStackLayout>
 
             <!-- Reset Progress button -->
-            <Border BackgroundColor="#E74C3C" StrokeThickness="0" StrokeShape="RoundRectangle 14" Padding="14" Margin="0,10,0,0">
+            <Border BackgroundColor="#E74C3C" StrokeThickness="0" StrokeShape="RoundRectangle 14" Padding="14" Margin="0,10,0,0"
+                    ToolTipProperties.Text="Reset all learning progress for this deck"
+                    SemanticProperties.Description="Reset progress button"
+                    SemanticProperties.Hint="Resets all learning progress and statistics for this reviewer deck">
               <Label Text="RESET PROGRESS" TextColor="White" FontAttributes="Bold" HorizontalOptions="Center" />
               <Border.GestureRecognizers>
                 <TapGestureRecognizer Tapped="OnResetProgressTapped"/>

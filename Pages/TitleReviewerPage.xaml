@@ -118,7 +118,9 @@
         <Label Grid.Column="1" Text="Create Reviewer"
                FontAttributes="Bold" FontSize="20"
                TextColor="{StaticResource TextPrimary}"
-               VerticalOptions="Center" HorizontalOptions="Start"/>
+               VerticalOptions="Center" HorizontalOptions="Start"
+               SemanticProperties.HeadingLevel="Level1"
+               SemanticProperties.Description="Create Reviewer page heading" />
       </Grid>
     </Border>
 
@@ -136,7 +138,7 @@
                     StrokeShape="Ellipse"
                     WidthRequest="64" HeightRequest="64"
                     HorizontalOptions="Center">
-              <Label Text="&#xF0E7;" FontFamily="FAS" FontSize="24"
+              <Label Text="&#xF0E7;" FontFamily="FontAwesome6FreeSolid" FontSize="24"
                      HorizontalOptions="Center" VerticalOptions="Center"
                      TextColor="{StaticResource PrimaryDark}"/>
             </Border>
@@ -144,7 +146,9 @@
             <Label Text="CREATE A REVIEWER OR FLASHCARD SET"
                    FontAttributes="Bold" FontSize="16"
                    TextColor="{StaticResource TextPrimary}"
-                   HorizontalTextAlignment="Start"/>
+                   HorizontalTextAlignment="Start"
+                   SemanticProperties.HeadingLevel="Level2"
+                   SemanticProperties.Description="Section heading" />
 
             <Label Text="Welcome to your reviewer library!&#10;First, simply add a title for your reviewer!"
                    FontSize="13" TextColor="{StaticResource TextSecondary}" />
@@ -158,7 +162,7 @@
             <!-- Outlined CTA -->
             <Border Style="{StaticResource OutlinePill}">
               <Grid ColumnDefinitions="Auto,*" VerticalOptions="Center">
-                <Label Text="&#xF044;" FontFamily="FAS" FontSize="18" TextColor="{StaticResource Primary}"
+                <Label Text="&#xF044;" FontFamily="FontAwesome6FreeSolid" FontSize="18" TextColor="{StaticResource Primary}"
                        VerticalOptions="Center"/>
                 <Label Grid.Column="1" Text="CREATE REVIEWER"
                        TextColor="{StaticResource TextPrimary}" FontAttributes="Bold"
@@ -177,13 +181,20 @@
                      BackgroundColor="Transparent"
                      TextColor="{StaticResource TextPrimary}"
                      PlaceholderColor="#9AA3AE"
-                     FontSize="15" />
+                     FontSize="15"
+                     ReturnType="Done"
+                     Completed="OnTitleEntryCompleted"
+                     SemanticProperties.Description="Reviewer title text field"
+                     SemanticProperties.Hint="Enter a name for your reviewer deck" />
               <BoxView Grid.Row="1" HeightRequest="1"
                        BackgroundColor="{StaticResource Divider}" />
             </Grid>
 
             <!-- Primary CTA -->
-            <Border Style="{StaticResource PrimaryPill}">
+            <Border Style="{StaticResource PrimaryPill}"
+                    ToolTipProperties.Text="Create new reviewer with this title"
+                    SemanticProperties.Description="Create new reviewer button"
+                    SemanticProperties.Hint="Creates a new reviewer deck and proceeds to add flashcards">
               <Grid ColumnDefinitions="Auto,*" VerticalOptions="Center">
                 <Label Text="Create New Reviewer" Grid.Column="1" TextColor="White"
                        FontAttributes="Bold" FontSize="16" VerticalOptions="Center" />

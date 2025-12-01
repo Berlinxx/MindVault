@@ -1,6 +1,6 @@
 ﻿using Microsoft.Extensions.Logging;
 using CommunityToolkit.Maui;
-using mindvault.Services; // restored for DatabaseService & MultiplayerService
+using mindvault.Services;
 using mindvault.Srs;
 using Microsoft.Maui.LifecycleEvents;
 
@@ -17,22 +17,23 @@ public static class MauiProgram
                .ConfigureFonts(fonts =>
                {
                    fonts.AddFont("OpenSans-Regular.ttf", "OpenSansRegular");
-                   fonts.AddFont("fa-solid-900.otf", "FAS");
+                   fonts.AddFont("fa-solid-900.otf", "FontAwesome6FreeSolid");
+                   fonts.AddFont("fa-solid-900.otf", "FAS"); // Keep for backward compatibility
                })
                .ConfigureLifecycleEvents(events =>
                {
 #if ANDROID
                    events.AddAndroid(android =>
                    {
-                       android.OnPause(activity => TrySaveEngine());
-                       android.OnStop(activity => TrySaveEngine());
+                       android.OnPause(_ => TrySaveEngine());
+                       android.OnStop(_ => TrySaveEngine());
                    });
 #endif
 #if IOS
                    events.AddiOS(ios =>
                    {
-                       ios.OnResignActivation(app => TrySaveEngine());
-                       ios.WillTerminate(app => TrySaveEngine());
+                       ios.OnResignActivation(_ => TrySaveEngine());
+                       ios.WillTerminate(_ => TrySaveEngine());
                    });
 #endif
 #if WINDOWS
@@ -46,7 +47,7 @@ public static class MauiProgram
 #endif
                });
 
-        // Register SQLite-backed DatabaseService as singleton
+        // Database service
         builder.Services.AddSingleton(sp =>
         {
             var dbPath = Path.Combine(FileSystem.AppDataDirectory, "mindvault.db3");
@@ -54,6 +55,11 @@ public static class MauiProgram
             Task.Run(() => db.InitializeAsync()).Wait();
             return db;
         });
+
+        // Global in-memory flashcard cache
+        builder.Services.AddSingleton<FlashcardMemoryCacheService>();
+        builder.Services.AddSingleton<DeckMemoryCacheService>();
+        builder.Services.AddSingleton<GlobalDeckPreloadService>();
 
         builder.Services.AddSingleton<ReviewersCacheService>();
         builder.Services.AddSingleton<SrsEngine>();
@@ -67,16 +73,39 @@ public static class MauiProgram
 #endif
         var app = builder.Build();
 
-        // Silent refined preload (does not notify user)
+        // Kick off reviewer metadata preload (safe, does not touch App services prematurely)
         _ = Task.Run(async () =>
         {
             try
             {
-                var cache = ServiceHelper.GetRequiredService<ReviewersCacheService>();
-                await cache.PreloadAsync();
+                var svc = app.Services.GetRequiredService<ReviewersCacheService>();
+                await svc.PreloadAsync();
             }
             catch { }
         });
+
+        // Kick off flashcard memory preload
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                var mem = app.Services.GetRequiredService<FlashcardMemoryCacheService>();
+                await mem.PreloadAllAsync();
+            }
+            catch { }
+        });
+
+        // Kick off global deck preload
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                var preload = app.Services.GetRequiredService<GlobalDeckPreloadService>();
+                await preload.PreloadAllAsync();
+            }
+            catch { }
+        });
+
         return app;
     }
 

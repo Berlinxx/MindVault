@@ -1,5 +1,7 @@
 using System.Collections.ObjectModel;
 using mindvault.Services;
+using mindvault.Controls;
+using CommunityToolkit.Maui.Views;
 using Plugin.Maui.Audio;
 
 namespace mindvault.Pages;
@@ -48,6 +50,7 @@ public partial class PlayerBuzzPage : ContentPage
         _questionBadge = this.FindByName<Label>("QuestionBadge");
 
         _multi.ClientParticipantJoined += OnClientParticipantJoined;
+        _multi.ClientParticipantLeft += OnClientParticipantLeft;
         _multi.ClientBuzzingStarted += OnBuzzingStarted;
         _multi.ClientBuzzReset += OnBuzzReset;
         _multi.ClientScoreUpdated += OnScoreUpdated;
@@ -65,6 +68,7 @@ public partial class PlayerBuzzPage : ContentPage
     {
         base.OnDisappearing();
         _multi.ClientParticipantJoined -= OnClientParticipantJoined;
+        _multi.ClientParticipantLeft -= OnClientParticipantLeft;
         _multi.ClientBuzzingStarted -= OnBuzzingStarted;
         _multi.ClientBuzzReset -= OnBuzzReset;
         _multi.ClientScoreUpdated -= OnScoreUpdated;
@@ -87,7 +91,7 @@ public partial class PlayerBuzzPage : ContentPage
         StopTimeupSound();
         MainThread.BeginInvokeOnMainThread(async () =>
         {
-            try { await DisplayAlert("Host", "The host has left the game.", "OK"); } catch { }
+            try { await this.ShowPopupAsync(new AppModal("Host", "The host has left the game.", "OK")); } catch { }
             _multi.DisconnectClient();
             if (Shell.Current is not null)
                 await Shell.Current.GoToAsync("//HomePage");
@@ -116,6 +120,41 @@ public partial class PlayerBuzzPage : ContentPage
         }
     }
 
+    private void OnClientParticipantLeft(string id)
+    {
+        MainThread.BeginInvokeOnMainThread(async () =>
+        {
+            var name = _namesById.TryGetValue(id, out var nm) ? nm : "A player";
+            
+            // Remove from local caches
+            _namesById.Remove(id);
+            _avatars.Remove(id);
+            _scoreMap.Remove(id);
+            
+            // Update leaderboard
+            var sorted = _scoreMap.OrderByDescending(kv => kv.Value).ToList();
+            Scores.Clear();
+            int rank = 1;
+            foreach (var kv in sorted)
+            {
+                var avatar = _avatars.TryGetValue(kv.Key, out var av) ? av : "avatar1.png";
+                var playerName = _namesById.TryGetValue(kv.Key, out var pn) ? pn : kv.Key;
+                Scores.Add(new Score
+                {
+                    Rank = rank,
+                    Name = playerName,
+                    Points = kv.Value,
+                    Image = avatar,
+                    IsLeader = rank == 1
+                });
+                rank++;
+            }
+            
+            // Show notification
+            try { await this.ShowPopupAsync(new AppModal("Player Left", $"{name} has left the game.", "OK")); } catch { }
+        });
+    }
+
     private void OnClientWrong(string id, string name)
     {
         _suppressTimeup = true;
@@ -124,7 +163,7 @@ public partial class PlayerBuzzPage : ContentPage
         MainThread.BeginInvokeOnMainThread(async () =>
         {
             await PlayWrongAsync();
-            await DisplayAlert("Wrong Answer", $"{name} is wrong! Steal the question!", "OK");
+            await this.ShowPopupAsync(new AppModal("Wrong Answer", $"{name} is wrong! Steal the question!", "OK"));
         });
     }
 
@@ -136,7 +175,7 @@ public partial class PlayerBuzzPage : ContentPage
         MainThread.BeginInvokeOnMainThread(async () =>
         {
             await PlayCorrectAsync();
-            await DisplayAlert("Correct Answer", text, "OK");
+            await this.ShowPopupAsync(new AppModal("Correct Answer", text, "OK"));
         });
     }
 
@@ -326,6 +365,29 @@ public partial class PlayerBuzzPage : ContentPage
         if (!_canBuzz) return;
         await RingBellAsync();
         await _multi.SendBuzzAsync();
+    }
+
+    private async void OnExitTapped(object? sender, TappedEventArgs e)
+    {
+        _suppressTimeup = true;
+        StopTimerUI();
+        StopTimeupSound();
+        
+        try
+        {
+            // Notify host that this player is leaving
+            await _multi.SendLeaveAsync();
+        }
+        catch { }
+        
+        // Disconnect from game
+        _multi.DisconnectClient();
+        
+        // Navigate to home
+        if (Shell.Current is not null)
+            await Shell.Current.GoToAsync("//HomePage");
+        else
+            await Navigation.PopToRootAsync();
     }
 
     private async Task RingBellAsync()

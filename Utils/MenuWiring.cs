@@ -1,3 +1,5 @@
+using CommunityToolkit.Maui.Views;
+using mindvault.Controls;
 using mindvault.Controls;
 using mindvault.Pages;
 using mindvault.Services;
@@ -72,7 +74,8 @@ public static class MenuWiring
                 // Extension enforcement (.txt only)
                 if (!string.Equals(Path.GetExtension(pick.FileName), ".txt", System.StringComparison.OrdinalIgnoreCase))
                 {
-                    await Application.Current?.MainPage?.DisplayAlert("Import", "Only .txt files are supported.", "OK")!;
+                    if (Application.Current?.MainPage != null)
+                        await Application.Current.MainPage.ShowPopupAsync(new AppModal("Import", "Only .txt files are supported.", "OK"));
                     return;
                 }
 
@@ -81,18 +84,25 @@ public static class MenuWiring
                 using (var reader = new StreamReader(stream))
                     content = await reader.ReadToEndAsync();
 
-                var (title, cards) = ParseExport(content);
+                var (title, cards, progressData) = ParseExport(content);
                 if (cards.Count == 0)
                 {
-                    await Application.Current?.MainPage?.DisplayAlert("Import", "No cards found in file.", "OK")!;
+                    if (Application.Current?.MainPage != null)
+                        await Application.Current.MainPage.ShowPopupAsync(new AppModal("Import", "No cards found in file.", "OK"));
                     return;
                 }
 
-                await Navigator.PushAsync(new ImportPage(title, cards), nav);
+                var importPage = new ImportPage(title, cards);
+                if (!string.IsNullOrEmpty(progressData))
+                {
+                    importPage.SetProgressData(progressData);
+                }
+                await Navigator.PushAsync(importPage, nav);
             }
             catch (Exception ex)
             {
-                await Application.Current?.MainPage?.DisplayAlert("Import Failed", ex.Message, "OK")!;
+                if (Application.Current?.MainPage != null)
+                    await Application.Current.MainPage.ShowPopupAsync(new AppModal("Import Failed", ex.Message, "OK"));
             }
         };
 
@@ -106,15 +116,31 @@ public static class MenuWiring
         };
     }
 
-    static (string Title, List<(string Q, string A)> Cards) ParseExport(string content)
+    static (string Title, List<(string Q, string A)> Cards, string ProgressData) ParseExport(string content)
     {
         var lines = content.Replace("\r", string.Empty).Split('\n');
         string title = lines.FirstOrDefault(l => l.StartsWith("Reviewer:", System.StringComparison.OrdinalIgnoreCase))?.Substring(9).Trim() ?? "Imported Reviewer";
+        string progressData = string.Empty;
+        
+        // Check for progress data
+        var progressLine = lines.FirstOrDefault(l => l.StartsWith("ProgressData:", System.StringComparison.OrdinalIgnoreCase));
+        if (progressLine != null)
+        {
+            progressData = progressLine.Substring(13).Trim();
+        }
+        
         var cards = new List<(string Q, string A)>();
         string? q = null;
         foreach (var raw in lines)
         {
             var line = raw.Trim();
+            // Skip metadata lines
+            if (line.StartsWith("Reviewer:", System.StringComparison.OrdinalIgnoreCase) ||
+                line.StartsWith("Questions:", System.StringComparison.OrdinalIgnoreCase) ||
+                line.StartsWith("Progress:", System.StringComparison.OrdinalIgnoreCase) ||
+                line.StartsWith("ProgressData:", System.StringComparison.OrdinalIgnoreCase))
+                continue;
+                
             if (line.StartsWith("Q:", System.StringComparison.OrdinalIgnoreCase))
             {
                 if (!string.IsNullOrWhiteSpace(q)) { cards.Add((q, string.Empty)); }
@@ -131,6 +157,6 @@ public static class MenuWiring
             }
         }
         if (!string.IsNullOrWhiteSpace(q)) cards.Add((q, string.Empty));
-        return (title, cards);
+        return (title, cards, progressData);
     }
 }

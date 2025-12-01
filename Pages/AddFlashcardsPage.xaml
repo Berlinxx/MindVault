@@ -81,8 +81,11 @@
     <Border Grid.Row="0" BackgroundColor="White" StrokeThickness="0" Padding="16,12" StrokeShape="RoundRectangle 0,0,18,18" Margin="0,0,0,8">
       <Grid ColumnDefinitions="*,Auto" VerticalOptions="Center">
         <Label x:Name="DeckTitleLabel" TextColor="{StaticResource TextPrimary}" FontAttributes="Bold" FontSize="18" VerticalOptions="Center" />
-        <Border Grid.Column="1" WidthRequest="34" HeightRequest="34" Stroke="#E8EDF2" StrokeThickness="1" StrokeShape="Ellipse" BackgroundColor="White">
-          <Label Text="&#xF00D;" FontFamily="FAS" FontSize="14" TextColor="{StaticResource TextPrimary}" HorizontalOptions="Center" VerticalOptions="Center" />
+        <Border Grid.Column="1" WidthRequest="34" HeightRequest="34" Stroke="#E8EDF2" StrokeThickness="1" StrokeShape="Ellipse" BackgroundColor="White"
+                ToolTipProperties.Text="Close and return to previous page"
+                SemanticProperties.Description="Close button"
+                SemanticProperties.Hint="Returns to the previous page">
+          <Label Text="&#xF00D;" FontFamily="FontAwesome6FreeSolid" FontSize="14" TextColor="{StaticResource TextPrimary}" HorizontalOptions="Center" VerticalOptions="Center" />
           <Border.GestureRecognizers>
             <TapGestureRecognizer Tapped="OnClose" />
           </Border.GestureRecognizers>
@@ -90,62 +93,113 @@
       </Grid>
     </Border>
 
-    <ScrollView Grid.Row="1">
+    <ScrollView x:Name="MainScrollView" Grid.Row="1">
       <VerticalStackLayout Padding="0,4,0,40" Spacing="0">
-        <Label Text="Add Flashcards" FontSize="26" FontAttributes="Bold" TextColor="White" Margin="24,4,24,18" />
+        <Label Text="Add Flashcards" FontSize="26" FontAttributes="Bold" TextColor="White" Margin="0,4,0,18" HorizontalOptions="Fill" HorizontalTextAlignment="Center"
+               SemanticProperties.HeadingLevel="Level1"
+               SemanticProperties.Description="Add Flashcards page heading" />
+
+        <Border Style="{StaticResource CardStyle}" IsVisible="{OnPlatform Android=false, iOS=true, MacCatalyst=true, WinUI=true}">
+          <VerticalStackLayout Spacing="14">
+            <HorizontalStackLayout Spacing="6" VerticalOptions="Center">
+              <Label Text="AI-Powered" FontAttributes="Bold" FontSize="20" TextColor="{StaticResource TextPrimary}"
+                     SemanticProperties.HeadingLevel="Level2"
+                     SemanticProperties.Description="AI-Powered section" />
+              <Label Text="NEW" FontSize="12" FontAttributes="Bold" TextColor="{StaticResource PrimaryDark}" VerticalOptions="Center" />
+            </HorizontalStackLayout>
+            <Border Style="{StaticResource SecondaryPill}"
+                    ToolTipProperties.Text="Use AI to generate flashcards from content (Windows only)"
+                    SemanticProperties.Description="Summarize from content button"
+                    SemanticProperties.Hint="Uses on-device AI to extract flashcards from text or documents">
+              <Label Text="SUMMARIZE FROM CONTENT" FontAttributes="Bold" FontSize="14" TextColor="{StaticResource TextPrimary}" HorizontalOptions="Center" />
+              <Border.GestureRecognizers><TapGestureRecognizer Tapped="OnSummarize" /></Border.GestureRecognizers>
+            </Border>
+            <Label Text="Use on-device AI to extract cards (Windows only)." FontSize="11" TextColor="{StaticResource TextSecondary}" HorizontalTextAlignment="Center"
+                   SemanticProperties.Description="AI feature description" />
+            <!-- AI Setup Status Label -->
+            <Label x:Name="AiSetupStatusLabel" Text="" FontSize="11" TextColor="{StaticResource PrimaryDark}" HorizontalTextAlignment="Center"
+                   SemanticProperties.Description="AI setup status message" />
+          </VerticalStackLayout>
+        </Border>
 
         <Border Style="{StaticResource CardStyle}">
           <VerticalStackLayout Spacing="14">
-            <Label Text="Manual" FontAttributes="Bold" FontSize="20" TextColor="{StaticResource TextPrimary}" />
-            <Border Style="{StaticResource PrimaryPill}">
+            <Label Text="Manual" FontAttributes="Bold" FontSize="20" TextColor="{StaticResource TextPrimary}"
+                   SemanticProperties.HeadingLevel="Level2"
+                   SemanticProperties.Description="Manual entry section" />
+            <Border Style="{StaticResource PrimaryPill}"
+                    ToolTipProperties.Text="Manually add flashcards with text and images"
+                    SemanticProperties.Description="Type flashcards button"
+                    SemanticProperties.Hint="Opens the editor to manually create flashcards">
               <Label Text="TYPE FLASHCARDS  +" FontAttributes="Bold" FontSize="15" TextColor="White" HorizontalOptions="Center" />
               <Border.GestureRecognizers><TapGestureRecognizer Tapped="OnTypeFlashcards" /></Border.GestureRecognizers>
             </Border>
-            <Label Text="Add cards manually (supports images)." FontSize="12" TextColor="{StaticResource TextSecondary}" HorizontalTextAlignment="Center" />
-            <Border Style="{StaticResource SecondaryPill}">
+            <Label Text="Add cards manually (supports images)." FontSize="12" TextColor="{StaticResource TextSecondary}" HorizontalTextAlignment="Center"
+                   SemanticProperties.Description="Manual entry description" />
+            <Border Style="{StaticResource SecondaryPill}"
+                    ToolTipProperties.Text="Import flashcards from .txt file"
+                    SemanticProperties.Description="Import flashcards button"
+                    SemanticProperties.Hint="Imports flashcards from a text export file">
               <Label Text="IMPORT FLASHCARDS" FontAttributes="Bold" FontSize="14" TextColor="{StaticResource TextPrimary}" HorizontalOptions="Center" />
               <Border.GestureRecognizers><TapGestureRecognizer Tapped="OnImportPaste" /></Border.GestureRecognizers>
             </Border>
-            <Label Text="Import .txt export file into this deck." FontSize="11" TextColor="{StaticResource TextSecondary}" HorizontalTextAlignment="Center" />
-            <Label Text="Offline AI-powered card generation is currently available only on Windows." FontSize="11" TextColor="{StaticResource PrimaryDark}" HorizontalTextAlignment="Center" />
+            <Label Text="Import .txt export file into this deck." FontSize="11" TextColor="{StaticResource TextSecondary}" HorizontalTextAlignment="Center"
+                   SemanticProperties.Description="Import feature description" />
+            <Label Text="Offline AI-powered card generation is currently available only on Windows." FontSize="11" TextColor="{StaticResource PrimaryDark}" HorizontalTextAlignment="Center"
+                   SemanticProperties.Description="Platform availability note" />
           </VerticalStackLayout>
         </Border>
 
         <Border Style="{StaticResource CardStyle}">
           <VerticalStackLayout Spacing="12">
-            <Label Text="Paste Formatted .TXT" FontAttributes="Bold" FontSize="20" TextColor="{StaticResource TextPrimary}" />
-            <Label Text="Format: |(question:answer)| — one pair per line or multiple pairs per line." FontSize="12" TextColor="{StaticResource TextSecondary}" />
-            <Label Text="Note: Use any online LLM to output lines directly like |(question:answer)|." FontSize="11" TextColor="{StaticResource PrimaryDark}" />
-            <Label Text="Examples:" FontSize="12" TextColor="{StaticResource TextSecondary}" />
-            <Border StrokeThickness="1" StrokeShape="RoundRectangle 12" Stroke="#D5E2EA" Padding="10" BackgroundColor="#F8FBFD">
-              <VerticalStackLayout Spacing="4">
-                <Label Text="|(An array of components designed to accomplish a particular objective according to plan.:System)|" FontSize="11" TextColor="{StaticResource TextPrimary}" />
-                <Label Text="|(A way of understanding an entity in terms of its purpose, as three steps.:Systems Thinking)|" FontSize="11" TextColor="{StaticResource TextPrimary}" />
-              </VerticalStackLayout>
-            </Border>
-            <Editor x:Name="PasteEditor" Placeholder="Paste here..." PlaceholderColor="#60717F" AutoSize="TextChanges" FontSize="13" HeightRequest="160" TextColor="{StaticResource TextPrimary}" />
-            <Border Style="{StaticResource PrimaryPill}">
+            <Label Text="Paste Formatted .TXT" FontAttributes="Bold" FontSize="20" TextColor="{StaticResource TextPrimary}"
+                   SemanticProperties.HeadingLevel="Level2"
+                   SemanticProperties.Description="Paste formatted text section" />
+            <Label Text="Format: |(question:answer)| — one pair per line or multiple pairs per line." FontSize="12" TextColor="{StaticResource TextSecondary}"
+                   SemanticProperties.Description="Format instructions for pasted text" />
+            <Label Text="Note: Use any online LLM (e.g., ChatGPT or Gemini) to output lines directly like |(question:answer)|. Use '/n' inside question or answer to denote a newline." FontSize="11" TextColor="{StaticResource PrimaryDark}"
+                   SemanticProperties.Description="Additional formatting notes and LLM usage tips" />
+            <Editor x:Name="PasteEditor" Placeholder="Paste here..." PlaceholderColor="#60717F" FontSize="13" HeightRequest="160" TextColor="{StaticResource TextPrimary}"
+                    IsEnabled="True"
+                    VerticalOptions="Start"
+                    SemanticProperties.Description="Paste flashcard text field"
+                    SemanticProperties.Hint="Paste formatted text with question and answer pairs in the format pipe question colon answer pipe" />
+            <!-- Processing spinner shown while parsing/creating cards -->
+            <ActivityIndicator x:Name="ProcessingIndicator" IsVisible="False" IsRunning="False" Color="{StaticResource PrimaryDark}"
+                               SemanticProperties.Description="Processing flashcards indicator"
+                               SemanticProperties.Hint="Please wait while flashcards are being created" />
+            <Border Style="{StaticResource PrimaryPill}"
+                    ToolTipProperties.Text="Create flashcards from pasted text"
+                    SemanticProperties.Description="Create flashcards button"
+                    SemanticProperties.Hint="Processes the pasted text and creates flashcards">
               <Label Text="CREATE FLASHCARDS" FontAttributes="Bold" FontSize="15" TextColor="White" HorizontalOptions="Center" />
               <Border.GestureRecognizers><TapGestureRecognizer Tapped="OnCreateFlashcardsTapped" /></Border.GestureRecognizers>
             </Border>
-            <Label x:Name="PasteResultLabel" FontSize="11" TextColor="{StaticResource PrimaryDark}" />
-          </VerticalStackLayout>
-        </Border>
-
-        <Border Style="{StaticResource CardStyle}" IsVisible="{OnPlatform Android=false, iOS=true, MacCatalyst=true, WinUI=true}">
-          <VerticalStackLayout Spacing="14">
-            <HorizontalStackLayout Spacing="6" VerticalOptions="Center">
-              <Label Text="AI-Powered" FontAttributes="Bold" FontSize="20" TextColor="{StaticResource TextPrimary}" />
-              <Label Text="NEW" FontSize="12" FontAttributes="Bold" TextColor="{StaticResource PrimaryDark}" VerticalOptions="Center" />
-            </HorizontalStackLayout>
-            <Border Style="{StaticResource SecondaryPill}">
-              <Label Text="SUMMARIZE FROM CONTENT" FontAttributes="Bold" FontSize="14" TextColor="{StaticResource TextPrimary}" HorizontalOptions="Center" />
-              <Border.GestureRecognizers><TapGestureRecognizer Tapped="OnSummarize" /></Border.GestureRecognizers>
-            </Border>
-            <Label Text="Use on-device AI to extract cards (Windows only)." FontSize="11" TextColor="{StaticResource TextSecondary}" HorizontalTextAlignment="Center" />
+            <Label x:Name="PasteResultLabel" FontSize="11" TextColor="{StaticResource PrimaryDark}"
+                   SemanticProperties.Description="Flashcard creation result message" />
           </VerticalStackLayout>
         </Border>
       </VerticalStackLayout>
     </ScrollView>
+
+    <!-- Installation Loading Overlay -->
+    <Grid x:Name="InstallationOverlay" Grid.RowSpan="2" BackgroundColor="#CC000000" IsVisible="False" ZIndex="100" InputTransparent="False"
+          SemanticProperties.Description="Installation progress dialog"
+          SemanticProperties.Hint="Python and AI dependencies are being installed">
+      <VerticalStackLayout HorizontalOptions="Center" VerticalOptions="Center" Spacing="20">
+        <Border BackgroundColor="White" StrokeShape="RoundRectangle 20" Padding="40,30" Shadow="{Shadow Opacity=0.3, Radius=20, Offset='0,10'}">
+          <VerticalStackLayout Spacing="20" WidthRequest="300">
+            <ActivityIndicator x:Name="InstallationSpinner" IsRunning="True" Color="{StaticResource Primary}" WidthRequest="50" HeightRequest="50" HorizontalOptions="Center"
+                               SemanticProperties.Description="Installation progress indicator"
+                               SemanticProperties.Hint="Installation in progress, please wait" />
+            <Label x:Name="InstallationStatusLabel" Text="Installing Python and dependencies..." FontSize="16" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}" HorizontalTextAlignment="Center"
+                   SemanticProperties.HeadingLevel="Level2"
+                   SemanticProperties.Description="Installation status" />
+            <Label x:Name="InstallationDetailLabel" Text="Please wait, this may take a few minutes..." FontSize="13" TextColor="{StaticResource TextSecondary}" HorizontalTextAlignment="Center"
+                   SemanticProperties.Description="Installation details and estimated time" />
+          </VerticalStackLayout>
+        </Border>
+      </VerticalStackLayout>
+    </Grid>
   </Grid>
 </ContentPage>

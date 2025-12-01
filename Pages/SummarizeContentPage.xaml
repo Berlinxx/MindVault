@@ -32,6 +32,17 @@
         </Setter.Value>
       </Setter>
     </Style>
+    <!-- AI Summary progress bar style -->
+    <Style x:Key="AiSummaryProgressBar" TargetType="ProgressBar">
+      <Setter Property="HeightRequest" Value="12" />
+      <Setter Property="BackgroundColor" Value="#E6EEF3" />
+      <Setter Property="ProgressColor" Value="#1E90FF" />
+    </Style>
+    <Style x:Key="RoundedTrack" TargetType="Border">
+      <Setter Property="Padding" Value="4" />
+      <Setter Property="StrokeShape" Value="RoundRectangle 12" />
+      <Setter Property="BackgroundColor" Value="#E6EEF3" />
+    </Style>
   </ContentPage.Resources>
 
   <ContentPage.Background>
@@ -47,8 +58,11 @@
         <!-- Deck title on left -->
         <Label x:Name="DeckTitleLabel" FontAttributes="Bold" FontSize="18" TextColor="{StaticResource TextPrimary}" VerticalOptions="Center" />
         <!-- Close X on right -->
-        <Border Grid.Column="1" WidthRequest="34" HeightRequest="34" Stroke="#E8EDF2" StrokeThickness="1" StrokeShape="Ellipse" BackgroundColor="White">
-          <Label Text="&#xF00D;" FontFamily="FAS" FontSize="14" TextColor="{StaticResource TextPrimary}" HorizontalOptions="Center" VerticalOptions="Center" />
+        <Border Grid.Column="1" WidthRequest="34" HeightRequest="34" Stroke="#E8EDF2" StrokeThickness="1" StrokeShape="Ellipse" BackgroundColor="White"
+                ToolTipProperties.Text="Close and return to previous page"
+                SemanticProperties.Description="Close button"
+                SemanticProperties.Hint="Returns to the previous page">
+          <Label Text="&#xF00D;" FontFamily="FontAwesome6FreeSolid" FontSize="14" TextColor="{StaticResource TextPrimary}" HorizontalOptions="Center" VerticalOptions="Center" />
           <Border.GestureRecognizers>
             <TapGestureRecognizer Tapped="OnClose" />
           </Border.GestureRecognizers>
@@ -58,12 +72,16 @@
 
     <ScrollView Grid.Row="1">
       <VerticalStackLayout Padding="24,8,24,40" Spacing="22">
-        <Label Text="Summarize from Content" FontSize="26" FontAttributes="Bold" TextColor="White" />
+        <Label Text="Summarize from Content" FontSize="26" FontAttributes="Bold" TextColor="White" Margin="0" HorizontalOptions="Fill" HorizontalTextAlignment="Center"
+               SemanticProperties.HeadingLevel="Level1"
+               SemanticProperties.Description="Summarize from Content page heading" />
 
-        <!-- Content input panel -->
-        <Border BackgroundColor="{StaticResource Panel}" StrokeShape="RoundRectangle 16" StrokeThickness="1" Stroke="{StaticResource PanelBorder}" Padding="0" HeightRequest="260">
+        <!-- Content input panel (white input with thin border) -->
+        <Border BackgroundColor="White" StrokeShape="RoundRectangle 16" StrokeThickness="1" Stroke="#D5E2EA" Padding="0" HeightRequest="260">
           <Grid>
-            <Editor x:Name="ContentEditor" BackgroundColor="Transparent" TextColor="White" Placeholder="Tap to type or paste your content" PlaceholderColor="#6E7C85" Margin="14" />
+            <Editor x:Name="ContentEditor" BackgroundColor="Transparent" TextColor="Black" Placeholder="Tap to type or paste your content" PlaceholderColor="#6E7C85" Margin="14"
+                    SemanticProperties.Description="Content text field"
+                    SemanticProperties.Hint="Type or paste the content you want to generate flashcards from" />
           </Grid>
         </Border>
 
@@ -80,7 +98,10 @@
         </Grid>
 
         <!-- Upload File -->
-        <Border Style="{StaticResource PrimaryPill}">
+        <Border Style="{StaticResource PrimaryPill}"
+                ToolTipProperties.Text="Upload document file (.pdf, .docx, .pptx, .txt)"
+                SemanticProperties.Description="Upload lesson file button"
+                SemanticProperties.Hint="Select a document file to extract flashcards from">
           <Label Text="UPLOAD LESSON FILE" FontAttributes="Bold" FontSize="15" TextColor="White" HorizontalOptions="Center" />
           <Border.GestureRecognizers>
             <TapGestureRecognizer Tapped="OnUploadFile" />
@@ -88,27 +109,61 @@
         </Border>
         <Label Text="(.pdf, .docx, .pptx, .txt)" FontSize="12" TextColor="#E0EEF7" HorizontalTextAlignment="Center" />
 
+        <!-- Manual Install Button (shown if Python not detected) -->
+        <Border x:Name="ManualInstallButton" Style="{StaticResource PrimaryPill}" IsVisible="False"
+                ToolTipProperties.Text="Install Python and Llama AI dependencies"
+                SemanticProperties.Description="Install Python and Llama button"
+                SemanticProperties.Hint="Installs the required AI dependencies for flashcard generation">
+          <Label Text="INSTALL PYTHON + LLAMA" FontAttributes="Bold" FontSize="15" TextColor="White" HorizontalOptions="Center" />
+          <Border.GestureRecognizers>
+            <TapGestureRecognizer Tapped="OnManualInstall" />
+          </Border.GestureRecognizers>
+        </Border>
         <!-- Generate cards button shown when there is content -->
-        <Border x:Name="GenerateButton" Style="{StaticResource PrimaryPill}" IsVisible="False">
+        <Border x:Name="GenerateButton" Style="{StaticResource PrimaryPill}" IsVisible="False"
+                ToolTipProperties.Text="Generate flashcards from content using AI"
+                SemanticProperties.Description="Generate flashcards button"
+                SemanticProperties.Hint="Uses AI to analyze content and create flashcards">
           <Label Text="GENERATE FLASHCARDS" FontAttributes="Bold" FontSize="15" TextColor="White" HorizontalOptions="Center" />
           <Border.GestureRecognizers>
             <TapGestureRecognizer Tapped="OnGenerate" />
           </Border.GestureRecognizers>
         </Border>
         <Label x:Name="StatusLabel" Text="" FontSize="12" TextColor="#E0EEF7" />
-        <!-- Progress cue -->
-        <Grid x:Name="InlineProgress" ColumnDefinitions="*,Auto" IsVisible="False">
-          <ProgressBar x:Name="ChunkProgress" Grid.Column="0" Progress="0" HeightRequest="6" BackgroundColor="#1E6DAA" ProgressColor="#5C6BF5" />
-          <Label x:Name="ChunkLabel" Grid.Column="1" Text="" FontSize="11" TextColor="#E0EEF7" Margin="12,0,0,0" />
-        </Grid>
       </VerticalStackLayout>
     </ScrollView>
 
-    <!-- Loading overlay -->
-    <Grid x:Name="LoadingOverlay" Grid.RowSpan="2" BackgroundColor="#66000000" IsVisible="False" ZIndex="50">
-      <VerticalStackLayout HorizontalOptions="Center" VerticalOptions="Center" Spacing="12">
-        <ActivityIndicator x:Name="LoadingSpinner" IsRunning="False" Color="White" WidthRequest="48" HeightRequest="48" />
-        <Label x:Name="OverlayProgressLabel" Text="" TextColor="White" FontSize="14" HorizontalTextAlignment="Center" />
+    <!-- Loading overlay with modal card -->
+    <Grid x:Name="LoadingOverlay" Grid.RowSpan="2" BackgroundColor="#CC000000" IsVisible="False" ZIndex="50" InputTransparent="False">
+      <VerticalStackLayout HorizontalOptions="Center" VerticalOptions="Center" Spacing="0">
+        <!-- White modal card -->
+        <Border BackgroundColor="White" StrokeShape="RoundRectangle 20" Padding="40,30" Shadow="{Shadow Opacity=0.3, Radius=20, Offset='0,10'}" WidthRequest="400">
+          <VerticalStackLayout Spacing="24">
+            <!-- Title -->
+            <Label Text="Processing Content" FontSize="20" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}" HorizontalTextAlignment="Center"
+                   SemanticProperties.HeadingLevel="Level2"
+                   SemanticProperties.Description="Processing content dialog" />
+            
+            <!-- Progress bar -->
+            <Border x:Name="OverlayTrack" HeightRequest="24" StrokeShape="RoundRectangle 12" BackgroundColor="#E6EEF3" Padding="3">
+              <Border x:Name="OverlayFill" HorizontalOptions="Start" WidthRequest="0" StrokeThickness="0" StrokeShape="RoundRectangle 9">
+                <Border.Background>
+                  <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                    <GradientStop Color="{StaticResource Primary}" Offset="0" />
+                    <GradientStop Color="{StaticResource PrimaryDark}" Offset="1" />
+                  </LinearGradientBrush>
+                </Border.Background>
+                <BoxView x:Name="OverlayShimmer" WidthRequest="120" Opacity="0.12" Background="White" HorizontalOptions="Start" />
+              </Border>
+            </Border>
+            
+            <!-- Progress status -->
+            <Label x:Name="OverlayProgressLabel" Text="Processing chunk 1/23 ETA &lt;1s" TextColor="{StaticResource TextSecondary}" FontSize="14" HorizontalTextAlignment="Center" />
+            
+            <!-- Additional info -->
+            <Label Text="This may take a few moments..." FontSize="12" TextColor="#7A8C98" HorizontalTextAlignment="Center" />
+          </VerticalStackLayout>
+        </Border>
       </VerticalStackLayout>
     </Grid>
   </Grid>

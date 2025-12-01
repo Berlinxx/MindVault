@@ -1,10 +1,11 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <ContentPage
-    x:Class="mindvault.Pages.ReviewersPage"
-    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
-    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
-    xmlns:controls="clr-namespace:mindvault.Controls"
-    Shell.NavBarIsVisible="False">
+  x:Class="mindvault.Pages.ReviewersPage"
+  xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+  xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+  xmlns:controls="clr-namespace:mindvault.Controls"
+  xmlns:conv="clr-namespace:mindvault.Converters"
+  Shell.NavBarIsVisible="False">
 
   <!-- ===== THEME ===== -->
   <ContentPage.Resources>
@@ -30,6 +31,7 @@
         </Setter.Value>
       </Setter>
     </Style>
+    <conv:TruncateConverter x:Key="TruncateConverter" />
 
     <!-- Filled primary pill -->
     <Style x:Key="PrimaryPill" TargetType="Border">
@@ -88,8 +90,9 @@
         <!-- Search circle -->
         <Border Grid.Column="2" WidthRequest="34" HeightRequest="34"
                 StrokeThickness="2" Stroke="{StaticResource Primary}"
-                StrokeShape="Ellipse" BackgroundColor="White">
-          <Label Text="&#xF002;" FontFamily="FAS" FontSize="14"
+                StrokeShape="Ellipse" BackgroundColor="White"
+                ToolTipProperties.Text="Search reviewers">
+          <Label Text="&#xF002;" FontFamily="FontAwesome6FreeSolid" FontSize="14"
                  TextColor="{StaticResource Primary}"
                  HorizontalOptions="Center" VerticalOptions="Center"/>
           <Border.GestureRecognizers>
@@ -120,58 +123,70 @@
               <Label Text="Sort by:" Grid.Row="0"
                      FontSize="12" TextColor="{StaticResource TextSecondary}"/>
 
-              <Border Grid.Row="1" Style="{StaticResource OutlineField}">
+              <!-- Dropdown trigger button -->
+              <Border x:Name="DropdownTrigger" Grid.Row="1" 
+                      Stroke="#E8EDF2" StrokeThickness="1"
+                      StrokeShape="RoundRectangle 8" Padding="12,10" BackgroundColor="#FFFFFF"
+                      ToolTipProperties.Text="Change sort order">
                 <Grid ColumnDefinitions="*,Auto">
-                  <!-- Sort picker -->
-                  <Picker Grid.Column="0" Title="Sort..."
-                          ItemsSource="{Binding SortOptions}"
-                          SelectedItem="{Binding SelectedSort, Mode=TwoWay}"
-                          TextColor="{StaticResource TextPrimary}"
-                          FontSize="14"/>
-                  <!-- Right dropdown chevron -->
-                  <Label Grid.Column="1" Text="&#xF078;" FontFamily="FAS" FontSize="12"
-                         HorizontalOptions="End" VerticalOptions="Center"
-                         TranslationX="-8" TextColor="{StaticResource Primary}"/>
+                  <Label Grid.Column="0" Text="{Binding SelectedSort}" 
+                         TextColor="#000000" FontSize="14" VerticalOptions="Center"/>
+                  <Label Grid.Column="1" Text="&#xF078;" FontFamily="FontAwesome6FreeSolid" FontSize="10"
+                         VerticalOptions="Center" TextColor="#666666" Margin="8,0,0,0"/>
                 </Grid>
+                <Border.GestureRecognizers>
+                  <TapGestureRecognizer Tapped="OnDropdownTapped"/>
+                </Border.GestureRecognizers>
               </Border>
             </Grid>
           </VerticalStackLayout>
         </Border>
 
         <!-- REVIEWER CARD LIST (shows when loaded) -->
-        <CollectionView ItemsSource="{Binding Reviewers}" SelectionMode="None" IsVisible="{Binding IsLoaded}" ItemSizingStrategy="MeasureFirstItem">
+        <CollectionView x:Name="ReviewerListView" ItemsSource="{Binding Reviewers}" SelectionMode="None" IsVisible="{Binding IsLoaded}" ItemSizingStrategy="MeasureFirstItem">
+          <CollectionView.ItemsLayout>
+            <LinearItemsLayout Orientation="Vertical" ItemSpacing="8" />
+          </CollectionView.ItemsLayout>
           <CollectionView.ItemTemplate>
             <DataTemplate>
               <Border Style="{StaticResource CardStyle}">
                 <VerticalStackLayout Spacing="12">
 
-                  <!-- Header strip -->
-                  <Grid ColumnDefinitions="*,Auto,Auto">
-                    <Border BackgroundColor="{StaticResource Ink}"
-                            StrokeThickness="0"
-                            StrokeShape="RoundRectangle 12"
-                            Padding="12,8"
-                            Margin="0,-6,0,0">
-                      <Label Text="{Binding Title}" TextColor="White" FontAttributes="Bold"/>
-                    </Border>
+                  <!-- Header strip: title pill sizes to content; spacer pushes the buttons to the right -->
+                  <Grid ColumnDefinitions="Auto,*,Auto,Auto" VerticalOptions="Center">
+                      <!-- Title pill (auto width based on text length) -->
+                      <Border Grid.Column="0" BackgroundColor="{StaticResource Ink}"
+                          StrokeThickness="0"
+                          StrokeShape="RoundRectangle 12"
+                          Padding="12,8"
+                          Margin="0,0,0,0"
+                          HorizontalOptions="Start">
+                        <Label Text="{Binding Title, Converter={StaticResource TruncateConverter}, ConverterParameter={OnPlatform Android=15, WinUI=20, Default=20}}"
+                           TextColor="White" FontAttributes="Bold"/>
+                      </Border>
 
-                    <!-- trash/delete icon -->
-                    <Border Grid.Column="1" WidthRequest="28" HeightRequest="28"
+                      <!-- Invisible spacer that blends with the card to push icons to the right -->
+                      <BoxView Grid.Column="1" BackgroundColor="{StaticResource Surface}" />
+
+                    <!-- trash/delete icon (fixed on right) -->
+                    <Border Grid.Column="2" WidthRequest="34" HeightRequest="34"
                             Stroke="#DDE4EA" StrokeThickness="1"
                             StrokeShape="Ellipse" BackgroundColor="White"
-                            Margin="0,0,8,0">
-                      <Label Text="&#xF1F8;" FontFamily="FAS" FontSize="12" TextColor="#E74C3C"
+                            Margin="0,0,8,0"
+                            ToolTipProperties.Text="Delete reviewer">
+                      <Label Text="&#xF1F8;" FontFamily="FontAwesome6FreeSolid" FontSize="14" TextColor="#E74C3C"
                              HorizontalOptions="Center" VerticalOptions="Center"/>
                       <Border.GestureRecognizers>
                         <TapGestureRecognizer Tapped="OnDeleteTapped"/>
                       </Border.GestureRecognizers>
                     </Border>
 
-                    <!-- export/share icon -->
-                    <Border Grid.Column="2" WidthRequest="28" HeightRequest="28"
+                    <!-- export/share icon (fixed on right) -->
+                    <Border Grid.Column="3" WidthRequest="34" HeightRequest="34"
                             Stroke="#DDE4EA" StrokeThickness="1"
-                            StrokeShape="Ellipse" BackgroundColor="White">
-                      <Label Text="&#xF35D;" FontFamily="FAS" FontSize="12" TextColor="{StaticResource Primary}"
+                            StrokeShape="Ellipse" BackgroundColor="White"
+                            ToolTipProperties.Text="Export reviewer to file">
+                      <Label Text="&#xF35D;" FontFamily="FontAwesome6FreeSolid" FontSize="14" TextColor="{StaticResource Primary}"
                              HorizontalOptions="Center" VerticalOptions="Center"/>
                       <Border.GestureRecognizers>
                         <TapGestureRecognizer Tapped="OnExportTapped"/>
@@ -185,8 +200,9 @@
                       <Label Text="Questions:" FontSize="14" TextColor="{StaticResource TextPrimary}"/>
                       <Label Grid.Column="1" Text="{Binding Questions}" FontSize="14" FontAttributes="Bold"
                              TextColor="{StaticResource TextPrimary}" Margin="4,0,0,0"/>
-                      <Label Grid.Column="2" Text="&#xF303;" FontFamily="FAS" FontSize="12"
-                             TextColor="{StaticResource Primary}" HorizontalOptions="Start" Margin="6,0,0,0">
+                      <Label Grid.Column="2" Text="&#xF303;" FontFamily="FontAwesome6FreeSolid" FontSize="12"
+                             TextColor="{StaticResource Primary}" HorizontalOptions="Start" Margin="6,0,0,0"
+                             ToolTipProperties.Text="Edit questions">
                         <Label.GestureRecognizers>
                           <TapGestureRecognizer Tapped="OnEditTapped" />
                         </Label.GestureRecognizers>
@@ -206,7 +222,8 @@
                     </Grid>
 
                     <!-- VIEW COURSE -->
-                    <Border Style="{StaticResource PrimaryPill}" Margin="0,6,0,0">
+                    <Border Style="{StaticResource PrimaryPill}" Margin="0,6,0,0"
+                            ToolTipProperties.Text="Start reviewing this course">
                       <Label Text="VIEW COURSE" TextColor="White" FontAttributes="Bold"
                              HorizontalOptions="Center" />
                       <Border.GestureRecognizers>
@@ -258,7 +275,8 @@
                 Style="{StaticResource PrimaryPill}"
                 HorizontalOptions="Center"
                 WidthRequest="260"
-                Margin="0,6,0,0">
+                Margin="0,6,0,0"
+                ToolTipProperties.Text="Create a new reviewer deck">
           <Label Text="+ CREATE REVIEWER"
                  FontAttributes="Bold" FontSize="16"
                  TextColor="White"
@@ -278,7 +296,8 @@
                 Padding="22,14"
                 HorizontalOptions="Center"
                 WidthRequest="260"
-                Margin="0,6,0,0">
+                Margin="0,6,0,0"
+                ToolTipProperties.Text="Import reviewer from .txt file">
           <Label Text="+ IMPORT"
                  FontAttributes="Bold" FontSize="16"
                  TextColor="White"
@@ -293,7 +312,53 @@
       </VerticalStackLayout>
     </ScrollView>
     
+    <!-- Loading overlay -->
+    <Grid x:Name="LoadingOverlay" Grid.RowSpan="2"
+          IsVisible="{Binding IsLoadingReviewers}"
+          BackgroundColor="#80000000"
+          VerticalOptions="FillAndExpand"
+          HorizontalOptions="FillAndExpand"
+          ZIndex="60">
+      <ActivityIndicator IsRunning="True"
+                         VerticalOptions="Center"
+                         HorizontalOptions="Center"
+                         Color="White"
+                         Scale="1.2" />
+    </Grid>
+
     <!-- Reusable bottom sheet lives at top Grid level -->
     <controls:BottomSheetMenu x:Name="MainMenu" Grid.RowSpan="2" ZIndex="50"/>
+
+    <!-- Dropdown options list (overlay popup) -->
+    <Border x:Name="DropdownList" IsVisible="False" 
+            Grid.RowSpan="2"
+            Stroke="#31B6D8" StrokeThickness="2"
+            StrokeShape="RoundRectangle 8" 
+            BackgroundColor="#FFFFFF"
+            Padding="0"
+            Margin="16,140,16,0"
+            VerticalOptions="Start"
+            HorizontalOptions="Fill"
+            ZIndex="1000">
+      <Border.Shadow>
+        <Shadow Opacity="0.2" Radius="8" Offset="0,4"/>
+      </Border.Shadow>
+      <CollectionView ItemsSource="{Binding SortOptions}" SelectionMode="None">
+        <CollectionView.ItemsLayout>
+          <LinearItemsLayout Orientation="Vertical" ItemSpacing="0" />
+        </CollectionView.ItemsLayout>
+        <CollectionView.ItemTemplate>
+          <DataTemplate>
+            <Border BackgroundColor="#FFFFFF" Padding="12,10" StrokeThickness="0">
+              <Label Text="{Binding}" TextColor="#000000" FontSize="14"/>
+              <Border.GestureRecognizers>
+                <TapGestureRecognizer Tapped="OnDropdownItemTapped" 
+                                      CommandParameter="{Binding}"/>
+              </Border.GestureRecognizers>
+            </Border>
+          </DataTemplate>
+        </CollectionView.ItemTemplate>
+      </CollectionView>
+    </Border>
   </Grid>
 </ContentPage>

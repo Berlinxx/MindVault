@@ -182,6 +182,7 @@ debug-*.txt
 logcat*.txt
 device_log*.txt
 pm_dump*.txt
+all_packages.txt
 
 ## Documentation and setup scripts (keep in repo)
 !SETUP_GUIDE.md
@@ -196,6 +197,7 @@ pm_dump*.txt
 device_screenshot*.png
 screenshot*.png
 temp_*.png
+*_screenshot*.png
 
 ## MAUI Specific
 **/.DS_Store

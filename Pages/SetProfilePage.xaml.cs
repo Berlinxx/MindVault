@@ -1,3 +1,5 @@
+using CommunityToolkit.Maui.Views;
+using mindvault.Controls;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Text.RegularExpressions;
@@ -87,10 +89,21 @@ public partial class SetProfilePage : ContentPage
 
     private async void OnSaveClicked(object sender, EventArgs e)
     {
+        await SaveProfileAsync();
+    }
+
+    private async void OnUsernameCompleted(object? sender, EventArgs e)
+    {
+        // Called when user presses Enter/Done on keyboard
+        await SaveProfileAsync();
+    }
+
+    private async Task SaveProfileAsync()
+    {
         var name = UsernameEntry.Text?.Trim() ?? string.Empty;
         if (!IsValidUsername(name))
         {
-            await DisplayAlert("Invalid Name", "Please enter a valid username.", "OK");
+            this.ShowPopup(new AppModal("Invalid Name", "Please enter a valid username.", "OK"));
             return;
         }
 

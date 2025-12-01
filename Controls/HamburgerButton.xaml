@@ -11,7 +11,7 @@
           StrokeShape="Ellipse"
           HorizontalOptions="Start" VerticalOptions="Center">
     <Label Text="&#xF0C9;"
-           FontFamily="FAS" FontSize="18" TextColor="#1C1C1C"
+           FontFamily="FontAwesome6FreeSolid" FontSize="18" TextColor="#1C1C1C"
            HorizontalOptions="Center" VerticalOptions="Center" />
     <Border.GestureRecognizers>
       <TapGestureRecognizer Tapped="OnTapped"/>

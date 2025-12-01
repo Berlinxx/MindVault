@@ -51,68 +51,108 @@
     </LinearGradientBrush>
   </ContentPage.Background>
 
-  <ScrollView>
-    <VerticalStackLayout Spacing="16" Padding="16,22,16,28">
+  <VerticalStackLayout Spacing="0">
+    <!-- Fixed Exit Button Header -->
+    <Grid Padding="16,40,16,10" BackgroundColor="Transparent">
+      <Border WidthRequest="50" HeightRequest="50"
+              BackgroundColor="{StaticResource Surface}" StrokeThickness="0"
+              StrokeShape="RoundRectangle 25" HorizontalOptions="End" VerticalOptions="Center"
+              ToolTipProperties.Text="Exit game"
+              SemanticProperties.Description="Exit button"
+              SemanticProperties.Hint="Leaves the game and returns to home page">
+        <Label Text="&#xF00D;" FontFamily="FontAwesome6FreeSolid" FontSize="20" TextColor="{StaticResource Ink}"
+               HorizontalOptions="Center" VerticalOptions="Center"
+               AutomationProperties.IsInAccessibleTree="False"/>
+        <Border.GestureRecognizers>
+          <TapGestureRecognizer Tapped="OnExitTapped"/>
+        </Border.GestureRecognizers>
+      </Border>
+    </Grid>
 
-      <Label x:Name="QuestionBadge" Text=" " FontSize="12" TextColor="White" HorizontalTextAlignment="Center"/>
+    <!-- Main Content -->
+    <ScrollView>
+      <VerticalStackLayout Spacing="20" Padding="16,10,16,28" HorizontalOptions="Center" MaximumWidthRequest="{OnIdiom Phone=500, Desktop=600}">
+
+        <Label x:Name="QuestionBadge" Text="Question 1 of 5" FontSize="30" TextColor="White" HorizontalTextAlignment="Center" FontAttributes="Bold" Margin="0,30,0,40"
+               SemanticProperties.Description="Question progress"/>
 
       <!-- Big Bell Icon -->
-      <Border x:Name="Bell" WidthRequest="120" HeightRequest="120"
+      <Border x:Name="Bell" WidthRequest="200" HeightRequest="200"
               BackgroundColor="#F2B51E" StrokeThickness="0"
-              StrokeShape="RoundRectangle 60" HorizontalOptions="Center"
-              Padding="0" TranslationY="4">
-        <Label Text="&#xF0F3;" FontFamily="FAS" FontSize="48" TextColor="White"
-               HorizontalOptions="Center" VerticalOptions="Center"/>
+              StrokeShape="RoundRectangle 100" HorizontalOptions="Center"
+              Padding="0"
+              ToolTipProperties.Text="Buzz in to answer"
+              SemanticProperties.Description="Buzz button"
+              SemanticProperties.Hint="Tap to signal you know the answer">
+        <Label Text="&#xF0F3;" FontFamily="FontAwesome6FreeSolid" FontSize="90" TextColor="White"
+               HorizontalOptions="Center" VerticalOptions="Center"
+               AutomationProperties.IsInAccessibleTree="False"/>
         <Border.GestureRecognizers>
           <TapGestureRecognizer Tapped="OnBellTapped"/>
         </Border.GestureRecognizers>
       </Border>
 
       <!-- Shared round timer visible to all -->
-      <Border x:Name="TimerPanel" Style="{StaticResource AnswerPill}" IsVisible="False">
+      <Border x:Name="TimerPanel" Style="{StaticResource AnswerPill}" IsVisible="False" Margin="0,0,0,20"
+              SemanticProperties.Description="Answer timer"
+              SemanticProperties.Hint="Time remaining to answer">
         <Label x:Name="TimerLabel" Text="10.0s" TextColor="Black" FontAttributes="Bold" FontSize="16" HorizontalOptions="Center" />
       </Border>
 
       <!-- Leaderboard -->
-      <Border Style="{StaticResource Card}" Margin="0,8,0,0">
+      <Border Style="{StaticResource Card}" Margin="0,115,0,0"
+              SemanticProperties.Description="Player leaderboard"
+              SemanticProperties.Hint="Shows current scores for all players">
         <VerticalStackLayout Spacing="10">
           <Label Text="LEADERBOARDS" FontAttributes="Bold" FontSize="13"
-                 HorizontalTextAlignment="Center" TextColor="{StaticResource TextPrimary}"/>
+                 HorizontalTextAlignment="Center" TextColor="{StaticResource TextPrimary}"
+                 SemanticProperties.HeadingLevel="Level2"
+                 SemanticProperties.Description="Leaderboard heading"/>
 
-          <CollectionView ItemsSource="{Binding Scores}" SelectionMode="None" HeightRequest="320">
-            <CollectionView.ItemTemplate>
-              <DataTemplate>
-                <Grid ColumnDefinitions="Auto,Auto,*,Auto" Padding="4,10" ColumnSpacing="10">
-                  <Label Text="{Binding Rank}" FontSize="18" VerticalOptions="Center" TextColor="{StaticResource TextPrimary}"/>
+          <ScrollView HeightRequest="320">
+            <CollectionView ItemsSource="{Binding Scores}" SelectionMode="None"
+                            SemanticProperties.Description="List of players and their scores">
+              <CollectionView.ItemTemplate>
+                <DataTemplate>
+                  <Grid ColumnDefinitions="Auto,Auto,*,Auto" Padding="4,10" ColumnSpacing="10">
+                    <Label Text="{Binding Rank}" FontSize="18" VerticalOptions="Center" TextColor="{StaticResource TextPrimary}"
+                           SemanticProperties.Description="Player rank"/>
 
-                  <Grid Grid.Column="1">
-                    <Border WidthRequest="42" HeightRequest="42" StrokeShape="Ellipse" StrokeThickness="0" BackgroundColor="#E8DFFB">
-                      <Image Source="{Binding Image}" Aspect="AspectFill">
-                        <Image.Clip>
-                          <EllipseGeometry Center="21,21" RadiusX="21" RadiusY="21"/>
-                        </Image.Clip>
-                      </Image>
+                    <Grid Grid.Column="1">
+                      <Border WidthRequest="42" HeightRequest="42" StrokeShape="Ellipse" StrokeThickness="0" BackgroundColor="#E8DFFB"
+                              SemanticProperties.Description="Player avatar">
+                        <Image Source="{Binding Image}" Aspect="AspectFill"
+                               AutomationProperties.IsInAccessibleTree="False">
+                          <Image.Clip>
+                            <EllipseGeometry Center="21,21" RadiusX="21" RadiusY="21"/>
+                          </Image.Clip>
+                        </Image>
+                      </Border>
+                      <!-- tiny crown for rank 1 -->
+                      <Label IsVisible="{Binding IsLeader}"
+                             Text="&#xF521;" FontFamily="FontAwesome6FreeSolid" FontSize="16" TextColor="#F1C40F"
+                             TranslationX="-6" TranslationY="-6"
+                             AutomationProperties.IsInAccessibleTree="False"/>
+                    </Grid>
+
+                    <Label Grid.Column="2" Text="{Binding Name}" FontSize="12"
+                           TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"
+                           SemanticProperties.Description="Player name"/>
+
+                    <Border Grid.Column="3" BackgroundColor="#0E6A85" StrokeThickness="0"
+                            StrokeShape="RoundRectangle 12" Padding="10,4" VerticalOptions="Center">
+                      <Label Text="{Binding PointsText}" FontSize="11" TextColor="White"
+                             SemanticProperties.Description="Player score"/>
                     </Border>
-                    <!-- tiny crown for rank 1 -->
-                    <Label IsVisible="{Binding IsLeader}"
-                           Text="&#xF521;" FontFamily="FAS" FontSize="12" TextColor="#F1C40F"
-                           TranslationX="-6" TranslationY="-6"/>
                   </Grid>
-
-                  <Label Grid.Column="2" Text="{Binding Name}" FontSize="12"
-                         TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
-
-                  <Border Grid.Column="3" BackgroundColor="#0E6A85" StrokeThickness="0"
-                          StrokeShape="RoundRectangle 12" Padding="10,4" VerticalOptions="Center">
-                    <Label Text="{Binding PointsText}" FontSize="11" TextColor="White"/>
-                  </Border>
-                </Grid>
-              </DataTemplate>
-            </CollectionView.ItemTemplate>
-          </CollectionView>
+                </DataTemplate>
+              </CollectionView.ItemTemplate>
+            </CollectionView>
+          </ScrollView>
         </VerticalStackLayout>
       </Border>
 
-    </VerticalStackLayout>
-  </ScrollView>
+      </VerticalStackLayout>
+    </ScrollView>
+  </VerticalStackLayout>
 </ContentPage>

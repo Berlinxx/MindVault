@@ -104,7 +104,9 @@
         <controls:HamburgerButton x:Name="Burger" />
         <Label Grid.Column="1" Text="Mind Vault" FontAttributes="Bold"
                FontSize="22" TextColor="{StaticResource TextPrimary}"
-               HorizontalOptions="Center" VerticalOptions="Center" />
+               HorizontalOptions="Center" VerticalOptions="Center"
+               SemanticProperties.HeadingLevel="Level1"
+               SemanticProperties.Description="Mind Vault application title" />
       </Grid>
     </Border>
 
@@ -121,14 +123,16 @@
                     StrokeShape="Ellipse"
                     WidthRequest="68" HeightRequest="68"
                     HorizontalOptions="Center">
-              <Label Text="&#xF0E7;" FontFamily="FAS" FontSize="26"
+              <Label Text="&#xF0E7;" FontFamily="FontAwesome6FreeSolid" FontSize="26"
                      HorizontalOptions="Center" VerticalOptions="Center"
                      TextColor="{StaticResource PrimaryDark}" />
             </Border>
 
             <Label Text="THE ULTIMATE OFFLINE STUDY COMPANION FOR STUDENTS"
                    FontAttributes="Bold" FontSize="16" TextColor="{StaticResource TextPrimary}"
-                   HorizontalTextAlignment="Center"/>
+                   HorizontalTextAlignment="Center"
+                   SemanticProperties.HeadingLevel="Level2"
+                   SemanticProperties.Description="Application tagline" />
             <Label Text="Master any subject with personalized flashcards and smart review tools."
                    FontSize="13" TextColor="{StaticResource TextSecondary}" HorizontalTextAlignment="Center"/>
             <Label Text="Create your own courses with ease—add notes, images, and auto-generated audio."
@@ -149,9 +153,12 @@
           <VerticalStackLayout Spacing="14">
 
             <!-- Create Reviewer -->
-            <Border Style="{StaticResource PrimaryPill}">
+            <Border Style="{StaticResource PrimaryPill}"
+                    ToolTipProperties.Text="Create a new reviewer deck"
+                    SemanticProperties.Description="Create reviewer button"
+                    SemanticProperties.Hint="Creates a new flashcard deck for studying">
               <Grid ColumnDefinitions="Auto,*" VerticalOptions="Center">
-                <Label Text="&#xF044;" FontFamily="FAS" FontSize="20" TextColor="White"
+                <Label Text="&#xF044;" FontFamily="FontAwesome6FreeSolid" FontSize="20" TextColor="White"
                        VerticalOptions="Center"/>
                 <Label Grid.Column="1" Text="Create Reviewer" TextColor="White"
                        FontAttributes="Bold" FontSize="16" VerticalOptions="Center" />
@@ -164,9 +171,12 @@
                    Text="Create your own reviewer with your terms and definitions in minutes" />
 
             <!-- Browse Reviewer -->
-            <Border Style="{StaticResource PrimaryPill}">
+            <Border Style="{StaticResource PrimaryPill}"
+                    ToolTipProperties.Text="View all your reviewer decks"
+                    SemanticProperties.Description="Browse reviewer button"
+                    SemanticProperties.Hint="Opens the list of all your created flashcard decks">
               <Grid ColumnDefinitions="Auto,*" VerticalOptions="Center">
-                <Label Text="&#xF1C0;" FontFamily="FAS" FontSize="20" TextColor="White"
+                <Label Text="&#xF1C0;" FontFamily="FontAwesome6FreeSolid" FontSize="20" TextColor="White"
                        VerticalOptions="Center"/>
                 <Label Grid.Column="1" Text="Browse Reviewer" TextColor="White"
                        FontAttributes="Bold" FontSize="16" VerticalOptions="Center" />
@@ -179,9 +189,12 @@
                    Text="Browse reviewers you created" />
 
             <!-- Multiplayer Mode -->
-            <Border Style="{StaticResource PrimaryPill}">
+            <Border Style="{StaticResource PrimaryPill}"
+                    ToolTipProperties.Text="Play with friends over local network"
+                    SemanticProperties.Description="Multiplayer mode button"
+                    SemanticProperties.Hint="Host or join a multiplayer game session">
               <Grid ColumnDefinitions="Auto,*" VerticalOptions="Center">
-                <Label Text="&#xF0C0;" FontFamily="FAS" FontSize="20" TextColor="White"
+                <Label Text="&#xF0C0;" FontFamily="FontAwesome6FreeSolid" FontSize="20" TextColor="White"
                        VerticalOptions="Center"/>
                 <Label Grid.Column="1" Text="Multiplayer Mode" TextColor="White"
                        FontAttributes="Bold" FontSize="16" VerticalOptions="Center" />
