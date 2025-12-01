@@ -74,7 +74,7 @@ public class FileTextExtractor
         catch { return string.Empty; }
     }
 
-    // 3. PPTX extraction via zip (unchanged with minor cleanup)
+    // 3. PPTX extraction via zip with improved OpenXML tag filtering
     async Task<string> ExtractPptxAsync(Stream s)
     {
         try
@@ -86,6 +86,8 @@ public class FileTextExtractor
             {
                 using var es = entry.Open(); using var reader = new StreamReader(es);
                 var xml = await reader.ReadToEndAsync();
+                
+                // Extract text from <a:t> tags only (actual slide text content)
                 int idx = 0;
                 while (true)
                 {
@@ -95,8 +97,38 @@ public class FileTextExtractor
                     if (open == -1) break;
                     var close = xml.IndexOf("</a:t>", open, StringComparison.OrdinalIgnoreCase);
                     if (close == -1) break;
+                    
                     var inner = xml.Substring(open + 1, close - open - 1);
-                    sb.Append(inner.Replace("&amp;", "&").Replace("&quot;", "\"")).Append(' ');
+                    
+                    // Decode XML entities only (remove OpenXML formatting)
+                    inner = inner.Replace("&amp;", "&")
+                                 .Replace("&quot;", "\"")
+                                 .Replace("&lt;", "<")
+                                 .Replace("&gt;", ">")
+                                 .Replace("&apos;", "'");
+                    
+                    // Skip if it looks like an XML tag remnant (contains < or >)
+                    if (inner.Contains('<') || inner.Contains('>'))
+                    {
+                        idx = close + 6;
+                        continue;
+                    }
+                    
+                    // Filter out pure numbers (likely formatting/positioning values)
+                    if (inner.All(c => char.IsDigit(c) || c == '.'))
+                    {
+                        idx = close + 6;
+                        continue;
+                    }
+                    
+                    // Filter out very short tokens (likely formatting artifacts)
+                    if (inner.Trim().Length < 2)
+                    {
+                        idx = close + 6;
+                        continue;
+                    }
+                    
+                    sb.Append(inner.Trim()).Append(' ');
                     idx = close + 6;
                 }
                 sb.AppendLine();
