@@ -137,13 +137,13 @@
             <Label Text="Add cards manually (supports images)." FontSize="12" TextColor="{StaticResource TextSecondary}" HorizontalTextAlignment="Center"
                    SemanticProperties.Description="Manual entry description" />
             <Border Style="{StaticResource SecondaryPill}"
-                    ToolTipProperties.Text="Import flashcards from .txt file"
+                    ToolTipProperties.Text="Import flashcards from .json file"
                     SemanticProperties.Description="Import flashcards button"
-                    SemanticProperties.Hint="Imports flashcards from a text export file">
+                    SemanticProperties.Hint="Imports flashcards from a JSON export file">
               <Label Text="IMPORT FLASHCARDS" FontAttributes="Bold" FontSize="14" TextColor="{StaticResource TextPrimary}" HorizontalOptions="Center" />
               <Border.GestureRecognizers><TapGestureRecognizer Tapped="OnImportPaste" /></Border.GestureRecognizers>
             </Border>
-            <Label Text="Import .txt export file into this deck." FontSize="11" TextColor="{StaticResource TextSecondary}" HorizontalTextAlignment="Center"
+            <Label Text="Import .json export file into this deck." FontSize="11" TextColor="{StaticResource TextSecondary}" HorizontalTextAlignment="Center"
                    SemanticProperties.Description="Import feature description" />
             <Label Text="Offline AI-powered card generation is currently available only on Windows." FontSize="11" TextColor="{StaticResource PrimaryDark}" HorizontalTextAlignment="Center"
                    SemanticProperties.Description="Platform availability note" />

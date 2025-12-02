@@ -392,16 +392,23 @@ public partial class ReviewersPage : ContentPage
 
     private async void OnImportTapped(object? sender, EventArgs e)
     {
-        // Prevent multiple simultaneous imports
-        if (_isImporting) return;
-        _isImporting = true;
-        
-        // Provide visual feedback
-        if (ImportPill != null)
+        await PerformImportAsync(this, Navigation);
+    }
+
+    /// <summary>
+    /// Public static method that performs import - can be called from hamburger menu or anywhere
+    /// </summary>
+    public static async Task PerformImportAsync(ContentPage page, INavigation navigation)
+    {
+        // Static lock to prevent multiple imports across all pages
+        if (_isImportingStatic) 
         {
-            ImportPill.Opacity = 0.5;
-            ImportPill.IsEnabled = false;
+            System.Diagnostics.Debug.WriteLine($"[ReviewersPage] Import already in progress (static check)");
+            return;
         }
+        _isImportingStatic = true;
+        
+        System.Diagnostics.Debug.WriteLine($"[ReviewersPage] PerformImportAsync called from {page.GetType().Name}");
         
         try
         {
@@ -420,12 +427,16 @@ public partial class ReviewersPage : ContentPage
                 FileTypes = fileTypes
             });
             
-            if (pick is null) return; // User cancelled
+            if (pick is null)
+            {
+                System.Diagnostics.Debug.WriteLine($"[ReviewersPage] User cancelled file picker");
+                return;
+            }
             
             var extension = Path.GetExtension(pick.FileName)?.ToLowerInvariant();
             if (extension != ".json")
             {
-                await PageHelpers.SafeDisplayAlertAsync(this, "Import", "Only JSON files are supported.", "OK");
+                await page.ShowPopupAsync(new AppModal("Import", "Only JSON files are supported.", "OK"));
                 return;
             }
 
@@ -435,35 +446,37 @@ public partial class ReviewersPage : ContentPage
                 content = await reader.ReadToEndAsync();
 
             // Check if encrypted
-            if (mindvault.Services.ExportEncryptionService.IsEncrypted(content))
+            if (ExportEncryptionService.IsEncrypted(content))
             {
                 bool passwordCorrect = false;
                 
                 while (!passwordCorrect)
                 {
                     // Ask for password using custom modal
-                    var passwordModal = new Controls.PasswordInputModal(
+                    var passwordModal = new PasswordInputModal(
                         "Password Required",
                         "This file is password-protected. Enter the password:",
                         "Password");
                     
-                    var passwordResult = await this.ShowPopupAsync(passwordModal);
+                    var passwordResult = await page.ShowPopupAsync(passwordModal);
                     var password = passwordResult as string;
                     
                     if (string.IsNullOrWhiteSpace(password))
                     {
                         // User cancelled password entry
+                        System.Diagnostics.Debug.WriteLine($"[ReviewersPage] User cancelled password entry");
                         return;
                     }
                     
                     try
                     {
-                        content = mindvault.Services.ExportEncryptionService.Decrypt(content, password);
+                        content = ExportEncryptionService.Decrypt(content, password);
                         passwordCorrect = true;
+                        System.Diagnostics.Debug.WriteLine($"[ReviewersPage] Decryption successful");
                     }
                     catch (System.Security.Cryptography.CryptographicException)
                     {
-                        var retry = await this.ShowPopupAsync(new Controls.InfoModal(
+                        var retry = await page.ShowPopupAsync(new InfoModal(
                             "Incorrect Password",
                             "The password you entered is incorrect. Would you like to try again?",
                             "Try Again",
@@ -474,24 +487,25 @@ public partial class ReviewersPage : ContentPage
                         if (!shouldRetry)
                         {
                             // User chose to cancel
+                            System.Diagnostics.Debug.WriteLine($"[ReviewersPage] User cancelled after incorrect password");
                             return;
                         }
                         // Loop continues to ask for password again
                     }
                     catch (Exception ex)
                     {
-                        await PageHelpers.SafeDisplayAlertAsync(this, "Import Failed", $"Decryption error: {ex.Message}", "OK");
+                        await page.ShowPopupAsync(new AppModal("Import Failed", $"Decryption error: {ex.Message}", "OK"));
                         return;
                     }
                 }
             }
 
             // Parse JSON
-            var (title, cards, progressData) = ParseJsonExport(content);
+            var (title, cards, progressData) = ParseJsonExportStatic(content);
 
             if (cards.Count == 0)
             {
-                await PageHelpers.SafeDisplayAlertAsync(this, "Import", "No cards found in file.", "OK");
+                await page.ShowPopupAsync(new AppModal("Import", "No cards found in file.", "OK"));
                 return;
             }
 
@@ -500,31 +514,32 @@ public partial class ReviewersPage : ContentPage
             {
                 importPage.SetProgressData(progressData);
             }
-            await Navigator.PushAsync(importPage, Navigation);
+            
+            // If called from hamburger menu (not ReviewersPage), set flag to navigate to ReviewersPage after import
+            if (page is not ReviewersPage)
+            {
+                importPage.SetNavigateToReviewersPage(true);
+                System.Diagnostics.Debug.WriteLine($"[ReviewersPage] SetNavigateToReviewersPage(true) for hamburger import");
+            }
+            
+            await Navigator.PushAsync(importPage, navigation);
+            System.Diagnostics.Debug.WriteLine($"[ReviewersPage] Import successful");
         }
         catch (Exception ex)
         {
-            await PageHelpers.SafeDisplayAlertAsync(this, "Import Failed", ex.Message, "OK");
+            System.Diagnostics.Debug.WriteLine($"[ReviewersPage] Import failed: {ex.Message}");
+            await page.ShowPopupAsync(new AppModal("Import Failed", ex.Message, "OK"));
         }
         finally
         {
-            // Restore visual state
-            if (ImportPill != null)
-            {
-                ImportPill.Opacity = 1.0;
-                ImportPill.IsEnabled = true;
-            }
-            
-            // Add small delay before allowing next import
-            await Task.Delay(500);
-            _isImporting = false;
+            _isImportingStatic = false;
+            System.Diagnostics.Debug.WriteLine($"[ReviewersPage] Import lock released");
         }
     }
 
-    /// <summary>
-    /// Parse JSON export format
-    /// </summary>
-    private (string Title, List<(string Q, string A)> Cards, string ProgressData) ParseJsonExport(string json)
+    private static bool _isImportingStatic = false;
+
+    private static (string Title, List<(string Q, string A)> Cards, string ProgressData) ParseJsonExportStatic(string json)
     {
         try
         {

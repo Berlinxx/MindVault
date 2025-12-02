@@ -1,17 +1,22 @@
 using CommunityToolkit.Maui.Views;
 using mindvault.Controls;
-using mindvault.Controls;
 using mindvault.Utils;
+using System.Collections.Generic;
 
 namespace mindvault.Utils;
 
 public static class PageHelpers
 {
+    // Track which menus have been wired to prevent duplicate handlers
+    private static HashSet<BottomSheetMenu> _wiredMenus = new HashSet<BottomSheetMenu>();
+    
     /// <summary>
     /// Setup hamburger menu functionality for any page
     /// </summary>
     public static void SetupHamburgerMenu(ContentPage page, string hamburgerName = "HamburgerButton", string menuName = "MainMenu")
     {
+        System.Diagnostics.Debug.WriteLine($"[PageHelpers] SetupHamburgerMenu called for page: {page.GetType().Name}");
+        
         // Find hamburger button and main menu
         var hamburgerButton = page.FindByName<HamburgerButton>(hamburgerName) ?? 
                              page.FindByName<HamburgerButton>("Burger");
@@ -20,12 +25,31 @@ public static class PageHelpers
 
         if (hamburgerButton != null && mainMenu != null)
         {
+            System.Diagnostics.Debug.WriteLine($"[PageHelpers] Found HamburgerButton and MainMenu");
+            
             // Remove previous handlers to avoid multiple subscriptions when pages re-appear
             hamburgerButton.Clicked -= async (_, __) => await mainMenu.ShowAsync();
-            hamburgerButton.Clicked += async (_, __) => await mainMenu.ShowAsync();
+            hamburgerButton.Clicked += async (_, __) =>
+            {
+                System.Diagnostics.Debug.WriteLine($"[PageHelpers] Hamburger button clicked on {page.GetType().Name}");
+                await mainMenu.ShowAsync();
+            };
 
-            // Wire menu actions → navigation
-            MenuWiring.Wire(mainMenu, page.Navigation);
+            // Wire menu actions only if not already wired
+            if (!_wiredMenus.Contains(mainMenu))
+            {
+                System.Diagnostics.Debug.WriteLine($"[PageHelpers] Wiring menu actions for first time...");
+                MenuWiring.Wire(mainMenu, page.Navigation, page);  // Pass the page instance!
+                _wiredMenus.Add(mainMenu);
+            }
+            else
+            {
+                System.Diagnostics.Debug.WriteLine($"[PageHelpers] Menu already wired, skipping...");
+            }
+        }
+        else
+        {
+            System.Diagnostics.Debug.WriteLine($"[PageHelpers] WARNING: HamburgerButton={hamburgerButton != null}, MainMenu={mainMenu != null}");
         }
     }
 

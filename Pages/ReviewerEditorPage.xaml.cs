@@ -26,7 +26,25 @@ public partial class ReviewerEditorPage : ContentPage, INotifyPropertyChanged
     public int ReviewerId
     {
         get => _reviewerId;
-        set { if (_reviewerId == value) return; _reviewerId = value; OnPropertyChanged(); LoadCardsAsync(); }
+        set 
+        { 
+            if (_reviewerId == value) return;
+            
+            // Clear items when switching to a different deck
+            if (_reviewerId != value && _reviewerId > 0)
+            {
+                Items.Clear();
+            }
+            
+            _reviewerId = value; 
+            OnPropertyChanged(); 
+            
+            // Load cards for the new reviewer
+            if (value > 0) 
+            {
+                LoadCardsAsync(); 
+            }
+        }
     }
 
     string _reviewerTitle = string.Empty;
@@ -144,10 +162,16 @@ public partial class ReviewerEditorPage : ContentPage, INotifyPropertyChanged
     protected override async void OnAppearing()
     {
         base.OnAppearing();
-        if (Items.Count == 0) IsLoading = true; // ensure spinner visible immediately
-        await mindvault.Utils.AnimHelpers.SlideFadeInAsync(Content);
+        
+        // Only show loading if we haven't loaded cards yet
+        if (Items.Count == 0) 
+            IsLoading = true;
+        
+        // Run animation concurrently with data loading (don't await here)
+        _ = AnimHelpers.SlideFadeInAsync(Content);
+        
         if (Shell.Current is not null)
-            Shell.Current.Navigating += OnShellNavigating; // global guard
+            Shell.Current.Navigating += OnShellNavigating;
     }
 
     protected override void OnDisappearing()
@@ -212,8 +236,14 @@ public partial class ReviewerEditorPage : ContentPage, INotifyPropertyChanged
     {
         if (ReviewerId > 0) return;
         if (string.IsNullOrWhiteSpace(ReviewerTitle)) return;
+        
+        // Fast path: check if it's already in the preloader cache
+        if (_preloader.Decks.ContainsKey(ReviewerId))
+            return;
+        
         try
         {
+            // Only query database if we don't have the ID
             var reviewers = await _db.GetReviewersAsync();
             var match = reviewers.FirstOrDefault(r => r.Title == ReviewerTitle);
             if (match is not null) ReviewerId = match.Id;
@@ -223,43 +253,61 @@ public partial class ReviewerEditorPage : ContentPage, INotifyPropertyChanged
 
     async void LoadCardsAsync()
     {
-        await EnsureReviewerIdAsync();
-        if (ReviewerId <= 0) return;
-
-        IsLoading = true;
-
-        List<Flashcard> cards = null!;
-        if (_preloader.Decks.TryGetValue(ReviewerId, out var fromRam))
+        try
         {
-            cards = fromRam;
-        }
-        else
-        {
-            // Fallback: load from DB if not yet preloaded
-            cards = await _db.GetFlashcardsAsync(ReviewerId);
-            // Update preloader store for future reads
-            _preloader.Decks[ReviewerId] = cards.ToList();
-        }
+            // Fast path: if we already have ReviewerId, skip the lookup
+            if (ReviewerId <= 0)
+                await EnsureReviewerIdAsync();
+            
+            if (ReviewerId <= 0) return;
 
-        Items.Clear();
-        foreach (var c in cards)
-        {
-            Items.Add(new ReviewItem
+            IsLoading = true;
+
+            List<Flashcard> cards;
+            
+            // Always try RAM cache first
+            if (_preloader.Decks.TryGetValue(ReviewerId, out var fromRam))
             {
-                Id = c.Id,
-                Question = c.Question,
-                Answer = c.Answer,
-                QuestionImagePath = c.QuestionImagePath,
-                AnswerImagePath = c.AnswerImagePath,
-                IsSaved = true,
-                Number = c.Order
-            });
-        }
-        RenumberSaved();
-        if (Items.Count == 0) Items.Add(new ReviewItem());
+                cards = fromRam;
+            }
+            else
+            {
+                // Fallback: load from DB if not yet preloaded
+                cards = await _db.GetFlashcardsAsync(ReviewerId);
+                // Update preloader store for future reads
+                _preloader.Decks[ReviewerId] = cards.ToList();
+            }
 
-        IsLoading = false;
-        try { await AnimHelpers.SlideFadeInAsync(Content); } catch { }
+            // Always clear before repopulating to ensure fresh data
+            Items.Clear();
+            
+            foreach (var c in cards)
+            {
+                Items.Add(new ReviewItem
+                {
+                    Id = c.Id,
+                    Question = c.Question,
+                    Answer = c.Answer,
+                    QuestionImagePath = c.QuestionImagePath,
+                    AnswerImagePath = c.AnswerImagePath,
+                    IsSaved = true,
+                    Number = c.Order
+                });
+            }
+            
+            RenumberSaved();
+            
+            // For new decks with no cards, add one empty card to start
+            if (Items.Count == 0) 
+                Items.Add(new ReviewItem());
+
+            IsLoading = false;
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[ReviewerEditorPage] LoadCardsAsync error: {ex.Message}");
+            IsLoading = false;
+        }
     }
 
     // === Shortcuts Modal ===

@@ -26,7 +26,16 @@ namespace mindvault.Controls
             SetupKeyboardHandler();
 
             // Focus the password entry when opened
-            this.Opened += (s, e) => _passwordEntry?.Focus();
+            this.Opened += (s, e) =>
+            {
+                System.Diagnostics.Debug.WriteLine($"[PasswordInputModal] Modal opened");
+                _passwordEntry?.Focus();
+            };
+            
+            this.Closed += (s, e) =>
+            {
+                System.Diagnostics.Debug.WriteLine($"[PasswordInputModal] Modal closed with result: {(e.Result == null ? "null" : e.Result.GetType().Name)}");
+            };
         }
 
         private void BuildUI()
@@ -188,11 +197,14 @@ namespace mindvault.Controls
 
         private void OnOkClicked(object? sender, EventArgs e)
         {
-            Close(_passwordEntry?.Text);
+            var password = _passwordEntry?.Text ?? string.Empty;
+            System.Diagnostics.Debug.WriteLine($"[PasswordInputModal] OK clicked, password length: {password.Length}");
+            Close(password);
         }
 
         private void OnCancelClicked(object? sender, EventArgs e)
         {
+            System.Diagnostics.Debug.WriteLine($"[PasswordInputModal] Cancel clicked");
             Close(null);
         }
 
@@ -224,13 +236,13 @@ namespace mindvault.Controls
             if (e.Key == Windows.System.VirtualKey.Enter)
             {
                 e.Handled = true;
-                // Only trigger OK if user explicitly clicks the button
-                // Don't auto-submit on Enter to prevent premature password mismatch
+                System.Diagnostics.Debug.WriteLine($"[PasswordInputModal] Enter key pressed");
                 OnOkClicked(null, EventArgs.Empty);
             }
             else if (e.Key == Windows.System.VirtualKey.Escape)
             {
                 e.Handled = true;
+                System.Diagnostics.Debug.WriteLine($"[PasswordInputModal] Escape key pressed");
                 OnCancelClicked(null, EventArgs.Empty);
             }
         }

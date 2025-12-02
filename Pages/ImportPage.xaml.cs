@@ -45,6 +45,7 @@ public partial class ImportPage : ContentPage
 
     private string _progressData = string.Empty;
     private bool _isImporting = false;
+    private bool _navigateToReviewersPage = false; // Flag to control navigation destination
     
     private async void OnImportTapped(object? sender, EventArgs e)
     {
@@ -159,13 +160,24 @@ public partial class ImportPage : ContentPage
             {
                 try
                 {
-                    await Navigation.PopAsync();
+                    if (_navigateToReviewersPage)
+                    {
+                        // Navigate to ReviewersPage (from hamburger menu)
+                        Debug.WriteLine($"[ImportPage] Navigating to ReviewersPage");
+                        await Shell.Current.GoToAsync("///ReviewersPage");
+                    }
+                    else
+                    {
+                        // Navigate back to previous page (from ReviewersPage)
+                        Debug.WriteLine($"[ImportPage] Navigating back to previous page");
+                        await Navigation.PopAsync();
+                    }
                     Debug.WriteLine($"[ImportPage] ✓ Navigation successful");
                 }
                 catch (Exception navEx)
                 {
                     Debug.WriteLine($"[ImportPage] Navigation error: {navEx.Message}");
-                    // Try alternative navigation
+                    // Try alternative navigation - always go to ReviewersPage on error
                     try
                     {
                         await Shell.Current.GoToAsync("///ReviewersPage");
@@ -218,6 +230,11 @@ public partial class ImportPage : ContentPage
     public void SetProgressData(string progressData)
     {
         _progressData = progressData;
+    }
+    
+    public void SetNavigateToReviewersPage(bool navigate)
+    {
+        _navigateToReviewersPage = navigate;
     }
 
     private bool ImportProgressData(int reviewerId)

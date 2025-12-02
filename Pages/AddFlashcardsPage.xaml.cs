@@ -196,17 +196,18 @@ public partial class AddFlashcardsPage : ContentPage
         {
             if (ProcessingIndicator != null) { ProcessingIndicator.IsVisible = true; ProcessingIndicator.IsRunning = true; }
             
+            // JSON only (changed from TXT)
             var fileTypes = new FilePickerFileType(new Dictionary<DevicePlatform, IEnumerable<string>>
             {
-                { DevicePlatform.Android, new[] { "text/plain" } },
-                { DevicePlatform.iOS, new[] { "public.plain-text" } },
-                { DevicePlatform.MacCatalyst, new[] { "public.plain-text" } },
-                { DevicePlatform.WinUI, new[] { ".txt" } },
+                { DevicePlatform.Android, new[] { "application/json" } },
+                { DevicePlatform.iOS, new[] { "public.json" } },
+                { DevicePlatform.MacCatalyst, new[] { "public.json" } },
+                { DevicePlatform.WinUI, new[] { ".json" } },
             });
             
             var pick = await FilePicker.PickAsync(new PickOptions 
             { 
-                PickerTitle = "Select .txt export file", 
+                PickerTitle = "Select JSON export file", 
                 FileTypes = fileTypes 
             });
             
@@ -216,9 +217,11 @@ public partial class AddFlashcardsPage : ContentPage
                 return;
             }
             
-            if (!string.Equals(Path.GetExtension(pick.FileName), ".txt", StringComparison.OrdinalIgnoreCase)) 
+            // Extension check for JSON only
+            var extension = Path.GetExtension(pick.FileName)?.ToLowerInvariant();
+            if (extension != ".json") 
             { 
-                await DisplayAlert("Import", "Only .txt files are supported.", "OK"); 
+                await DisplayAlert("Import", "Only JSON files are supported.", "OK"); 
                 if (ProcessingIndicator != null) { ProcessingIndicator.IsRunning = false; ProcessingIndicator.IsVisible = false; }
                 return; 
             }
@@ -235,7 +238,64 @@ public partial class AddFlashcardsPage : ContentPage
                 return;
             }
             
-            var (importedTitle, parsed, progressData) = ParseExport(content);
+            // Check if encrypted
+            if (mindvault.Services.ExportEncryptionService.IsEncrypted(content))
+            {
+                bool passwordCorrect = false;
+                
+                while (!passwordCorrect)
+                {
+                    // Ask for password using custom modal
+                    var passwordModal = new mindvault.Controls.PasswordInputModal(
+                        "Password Required",
+                        "This file is password-protected. Enter the password:",
+                        "Password");
+                    
+                    var passwordResult = await this.ShowPopupAsync(passwordModal);
+                    var password = passwordResult as string;
+                    
+                    if (string.IsNullOrWhiteSpace(password))
+                    {
+                        // User cancelled password entry
+                        if (ProcessingIndicator != null) { ProcessingIndicator.IsRunning = false; ProcessingIndicator.IsVisible = false; }
+                        return;
+                    }
+                    
+                    try
+                    {
+                        content = mindvault.Services.ExportEncryptionService.Decrypt(content, password);
+                        passwordCorrect = true;
+                    }
+                    catch (System.Security.Cryptography.CryptographicException)
+                    {
+                        var retry = await this.ShowPopupAsync(new mindvault.Controls.InfoModal(
+                            "Incorrect Password",
+                            "The password you entered is incorrect. Would you like to try again?",
+                            "Try Again",
+                            "Cancel"));
+                        
+                        var shouldRetry = retry is bool b && b;
+                        
+                        if (!shouldRetry)
+                        {
+                            // User chose to cancel
+                            if (ProcessingIndicator != null) { ProcessingIndicator.IsRunning = false; ProcessingIndicator.IsVisible = false; }
+                            return;
+                        }
+                        // Loop continues to ask for password again
+                    }
+                    catch (Exception ex)
+                    {
+                        await DisplayAlert("Import Failed", $"Decryption error: {ex.Message}", "OK");
+                        if (ProcessingIndicator != null) { ProcessingIndicator.IsRunning = false; ProcessingIndicator.IsVisible = false; }
+                        return;
+                    }
+                }
+            }
+            
+            // Parse JSON format
+            var (importedTitle, parsed, progressData) = ParseJsonExport(content);
+            
             if (parsed.Count == 0)
             {
                 await DisplayAlert("Import", "No cards found in file.", "OK");
@@ -250,7 +310,7 @@ public partial class AddFlashcardsPage : ContentPage
                 var result = await this.ShowPopupAsync(new mindvault.Controls.AppModal(
                     "Progress Detected", 
                     "This file contains saved progress. Would you like to continue from where you left off?",
-                    "Continue Progress", "Start Fresh"));
+                    "Continue", "Start Fresh"));
                 useProgress = result is bool b && b;
             }
             
@@ -299,10 +359,33 @@ public partial class AddFlashcardsPage : ContentPage
             {
                 try
                 {
-                    var bytes = Convert.FromBase64String(progressData);
-                    var progressJson = System.Text.Encoding.UTF8.GetString(bytes);
+                    string progressJson;
                     
-                    System.Diagnostics.Debug.WriteLine($"[AddFlashcardsPage] Original progress JSON length: {progressJson.Length}");
+                    // Try to parse directly as JSON first (new format)
+                    try
+                    {
+                        var test = System.Text.Json.JsonSerializer.Deserialize<List<System.Text.Json.JsonElement>>(progressData);
+                        if (test != null && test.Count > 0)
+                        {
+                            // It's already JSON, use directly
+                            progressJson = progressData;
+                            System.Diagnostics.Debug.WriteLine($"[AddFlashcardsPage] Progress data is plain JSON format");
+                        }
+                        else
+                        {
+                            System.Diagnostics.Debug.WriteLine($"[AddFlashcardsPage] Progress data parsed but empty");
+                            throw new Exception("Empty progress data");
+                        }
+                    }
+                    catch
+                    {
+                        // Not JSON, try base64 decode (legacy TXT format fallback)
+                        var bytes = Convert.FromBase64String(progressData);
+                        progressJson = System.Text.Encoding.UTF8.GetString(bytes);
+                        System.Diagnostics.Debug.WriteLine($"[AddFlashcardsPage] Progress data was base64 encoded (legacy format)");
+                    }
+                    
+                    System.Diagnostics.Debug.WriteLine($"[AddFlashcardsPage] Decoded progress JSON length: {progressJson.Length}");
                     
                     // Parse the old progress data
                     var oldProgress = System.Text.Json.JsonSerializer.Deserialize<List<System.Text.Json.JsonElement>>(progressJson);
@@ -385,6 +468,44 @@ public partial class AddFlashcardsPage : ContentPage
         }
     }
 
+    /// <summary>
+    /// Parse JSON export format
+    /// </summary>
+    static (string Title, List<(string Q, string A)> Cards, string ProgressData) ParseJsonExport(string json)
+    {
+        try
+        {
+            var options = new System.Text.Json.JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            };
+            
+            var export = System.Text.Json.JsonSerializer.Deserialize<mindvault.Models.ReviewerExport>(json, options);
+            if (export == null)
+            {
+                return ("Imported Reviewer", new List<(string, string)>(), string.Empty);
+            }
+
+            var cards = export.Cards?
+                .Select(c => (Q: c.Question ?? string.Empty, A: c.Answer ?? string.Empty))
+                .ToList() ?? new List<(string, string)>();
+
+            var progressData = export.Progress?.Enabled == true && !string.IsNullOrEmpty(export.Progress?.Data)
+                ? export.Progress.Data
+                : string.Empty;
+
+            return (export.Title ?? "Imported Reviewer", cards, progressData);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[AddFlashcardsPage] JSON parse error: {ex.Message}");
+            throw new InvalidDataException("Invalid JSON export file format.");
+        }
+    }
+
+    /// <summary>
+    /// Parse lines for "Paste Formatted .TXT" section
+    /// </summary>
     static List<(string Q,string A)> ParseLines(string raw)
     {
         var result = new List<(string Q,string A)>();
@@ -423,10 +544,10 @@ public partial class AddFlashcardsPage : ContentPage
             if (pipeCount == 1)
             {
                 var idxPipe = line.IndexOf('|');
-                    var q = line.Substring(0, idxPipe).Trim();
-                    var a = line.Substring(idxPipe + 1).Trim();
-                    if (!string.IsNullOrEmpty(q)) q = q.Replace("/n", "\n");
-                    if (!string.IsNullOrEmpty(a)) a = a.Replace("/n", "\n");
+                var q = line.Substring(0, idxPipe).Trim();
+                var a = line.Substring(idxPipe + 1).Trim();
+                if (!string.IsNullOrEmpty(q)) q = q.Replace("/n", "\n");
+                if (!string.IsNullOrEmpty(a)) a = a.Replace("/n", "\n");
                 if (!string.IsNullOrWhiteSpace(q) || !string.IsNullOrWhiteSpace(a))
                     result.Add((q, a));
             }
@@ -435,10 +556,10 @@ public partial class AddFlashcardsPage : ContentPage
                 var tokens = line.Split('|');
                 for (int i = 0; i + 1 < tokens.Length; i += 2)
                 {
-                        var q = tokens[i].Trim();
-                        var a = tokens[i + 1].Trim();
-                        if (!string.IsNullOrEmpty(q)) q = q.Replace("/n", "\n");
-                        if (!string.IsNullOrEmpty(a)) a = a.Replace("/n", "\n");
+                    var q = tokens[i].Trim();
+                    var a = tokens[i + 1].Trim();
+                    if (!string.IsNullOrEmpty(q)) q = q.Replace("/n", "\n");
+                    if (!string.IsNullOrEmpty(a)) a = a.Replace("/n", "\n");
                     if (!string.IsNullOrWhiteSpace(q) || !string.IsNullOrWhiteSpace(a))
                         result.Add((q, a));
                 }
@@ -458,38 +579,6 @@ public partial class AddFlashcardsPage : ContentPage
             }
         }
         return result;
-    }
-
-    static (string Title, List<(string Q, string A)> Cards, string ProgressData) ParseExport(string content)
-    {
-        var lines = content.Replace("\r", string.Empty).Split('\n');
-        string title = lines.FirstOrDefault(l => l.StartsWith("Reviewer:", StringComparison.OrdinalIgnoreCase))?.Substring(9).Trim() ?? "Imported";
-        string progressData = string.Empty;
-        
-        // Check for progress data
-        var progressLine = lines.FirstOrDefault(l => l.StartsWith("ProgressData:", StringComparison.OrdinalIgnoreCase));
-        if (progressLine != null)
-        {
-            progressData = progressLine.Substring(13).Trim();
-        }
-        
-        var cards = new List<(string Q, string A)>();
-        string? q = null;
-        foreach (var raw in lines)
-        {
-            var line = raw.Trim();
-            // Skip metadata lines
-            if (line.StartsWith("Reviewer:", StringComparison.OrdinalIgnoreCase) ||
-                line.StartsWith("Questions:", StringComparison.OrdinalIgnoreCase) ||
-                line.StartsWith("Progress:", StringComparison.OrdinalIgnoreCase) ||
-                line.StartsWith("ProgressData:", StringComparison.OrdinalIgnoreCase))
-                continue;
-                
-            if (line.StartsWith("Q:", StringComparison.OrdinalIgnoreCase)) { if (!string.IsNullOrWhiteSpace(q)) cards.Add((q, string.Empty)); q = line.Substring(2).Trim(); }
-            else if (line.StartsWith("A:", StringComparison.OrdinalIgnoreCase)) { var a = line.Substring(2).Trim(); if (!string.IsNullOrWhiteSpace(q) || !string.IsNullOrWhiteSpace(a)) { cards.Add((q ?? string.Empty, a)); q = null; } }
-        }
-        if (!string.IsNullOrWhiteSpace(q)) cards.Add((q, string.Empty));
-        return (title, cards, progressData);
     }
 
     async void OnCreateFlashcardsTapped(object? sender, TappedEventArgs e)

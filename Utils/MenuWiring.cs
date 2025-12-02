@@ -1,6 +1,5 @@
 using CommunityToolkit.Maui.Views;
 using mindvault.Controls;
-using mindvault.Controls;
 using mindvault.Pages;
 using mindvault.Services;
 using Microsoft.Maui.Storage;
@@ -14,184 +13,92 @@ namespace mindvault.Utils;
 
 public static class MenuWiring
 {
-    public static void Wire(BottomSheetMenu menu, INavigation nav)
+    public static void Wire(BottomSheetMenu menu, INavigation initialNav, ContentPage ownerPage)
     {
-        // Header tap -> Home (absolute to root)
+        // Store owner page for reliable popup showing
+        ContentPage? storedOwnerPage = ownerPage;
+        
+        // Helper to get current page + navigation each time (avoid stale nav)
+        (ContentPage? page, INavigation? nav) GetCurrent()
+        {
+            // Prefer the stored owner page (the page that owns this menu)
+            if (storedOwnerPage != null)
+                return (storedOwnerPage, storedOwnerPage.Navigation);
+            
+            // Fallback to dynamic resolution
+            ContentPage? page = null;
+            if (Shell.Current?.CurrentPage is ContentPage shellPage) page = shellPage;
+            else if (Application.Current?.Windows?.FirstOrDefault()?.Page is ContentPage mainPage) page = mainPage;
+            else if (Application.Current?.Windows?.FirstOrDefault()?.Page is NavigationPage navPage && navPage.CurrentPage is ContentPage currentPage) page = currentPage;
+            var nav = page?.Navigation ?? initialNav;
+            return (page, nav);
+        }
+
+        // Header tap -> Home
         menu.HeaderTapped += async (_, __) =>
         {
+            var (_, nav) = GetCurrent();
             if (Shell.Current is not null)
                 await Navigator.GoToAsync($"///{nameof(HomePage)}");
-            else
+            else if (nav != null)
                 await Navigator.PopToRootAsync(nav);
         };
 
-        // Create Reviewer (absolute navigation to reset stack)
         menu.CreateTapped += async (_, __) =>
         {
+            var (_, nav) = GetCurrent();
+            System.Diagnostics.Debug.WriteLine($"[MenuWiring] Create tapped - navigating to TitleReviewerPage");
             if (Shell.Current is not null)
                 await Navigator.GoToAsync($"///{nameof(TitleReviewerPage)}");
-            else
+            else if (nav != null)
                 await Navigator.PushAsync(new TitleReviewerPage(), nav);
         };
 
-        // Browse Reviewer (absolute navigation to reset stack)
         menu.BrowseTapped += async (_, __) =>
         {
+            var (_, nav) = GetCurrent();
+            System.Diagnostics.Debug.WriteLine($"[MenuWiring] Browse tapped - navigating to ReviewersPage");
             if (Shell.Current is not null)
                 await Navigator.GoToAsync($"///{nameof(ReviewersPage)}");
-            else
+            else if (nav != null)
                 await Navigator.PushAsync(new ReviewersPage(), nav);
         };
 
-        // Multiplayer Mode (registered route, keep normal push)
         menu.MultiplayerTapped += async (_, __) =>
         {
+            var (_, nav) = GetCurrent();
+            System.Diagnostics.Debug.WriteLine($"[MenuWiring] Multiplayer tapped - navigating to MultiplayerPage");
             if (Shell.Current is not null)
                 await Navigator.GoToAsync(nameof(MultiplayerPage));
-            else
+            else if (nav != null)
                 await Navigator.PushAsync(new MultiplayerPage(), nav);
         };
 
-        // Import -> JSON only
         menu.ImportTapped += async (_, __) =>
         {
-            try
+            var (currentPage, nav) = GetCurrent();
+            if (currentPage == null || nav == null)
             {
-                var fileTypes = new FilePickerFileType(new Dictionary<DevicePlatform, IEnumerable<string>>
-                {
-                    { DevicePlatform.Android, new[] { "application/json" } },
-                    { DevicePlatform.iOS, new[] { "public.json" } },
-                    { DevicePlatform.MacCatalyst, new[] { "public.json" } },
-                    { DevicePlatform.WinUI, new[] { ".json" } },
-                });
-
-                var pick = await FilePicker.PickAsync(new PickOptions
-                {
-                    PickerTitle = "Select JSON export file",
-                    FileTypes = fileTypes
-                });
-                if (pick is null) return;
-
-                // Extension check for JSON only
-                var extension = Path.GetExtension(pick.FileName)?.ToLowerInvariant();
-                if (extension != ".json")
-                {
-                    if (Application.Current?.MainPage != null)
-                        await Application.Current.MainPage.ShowPopupAsync(new AppModal("Import", "Only JSON files are supported.", "OK"));
-                    return;
-                }
-
-                string content;
-                using (var stream = await pick.OpenReadAsync())
-                using (var reader = new StreamReader(stream))
-                    content = await reader.ReadToEndAsync();
-
-                // Check if encrypted
-                if (mindvault.Services.ExportEncryptionService.IsEncrypted(content))
-                {
-                    // Ask for password using custom modal
-                    var passwordModal = new PasswordInputModal(
-                        "Password Required",
-                        "This file is password-protected. Enter the password:",
-                        "Password");
-                    
-                    var passwordResult = Application.Current?.MainPage != null 
-                        ? await Application.Current.MainPage.ShowPopupAsync(passwordModal)
-                        : null;
-                    var password = passwordResult as string;
-                    
-                    if (!string.IsNullOrWhiteSpace(password))
-                    {
-                        try
-                        {
-                            content = mindvault.Services.ExportEncryptionService.Decrypt(content, password);
-                        }
-                        catch (CryptographicException)
-                        {
-                            if (Application.Current?.MainPage != null)
-                                await Application.Current.MainPage.ShowPopupAsync(new AppModal("Import Failed", "Incorrect password. The file could not be decrypted.", "OK"));
-                            return;
-                        }
-                        catch (Exception ex)
-                        {
-                            if (Application.Current?.MainPage != null)
-                                await Application.Current.MainPage.ShowPopupAsync(new AppModal("Import Failed", $"Decryption error: {ex.Message}", "OK"));
-                            return;
-                        }
-                    }
-                    else
-                    {
-                        // User cancelled password entry
-                        return;
-                    }
-                }
-
-                // Parse JSON format
-                var (title, cards, progressData) = ParseJsonExport(content);
-
-                if (cards.Count == 0)
-                {
-                    if (Application.Current?.MainPage != null)
-                        await Application.Current.MainPage.ShowPopupAsync(new AppModal("Import", "No cards found in file.", "OK"));
-                    return;
-                }
-
-                var importPage = new ImportPage(title, cards);
-                if (!string.IsNullOrEmpty(progressData))
-                {
-                    importPage.SetProgressData(progressData);
-                }
-                await Navigator.PushAsync(importPage, nav);
+                System.Diagnostics.Debug.WriteLine($"[MenuWiring] Could not get current page/nav");
+                return;
             }
-            catch (Exception ex)
-            {
-                if (Application.Current?.MainPage != null)
-                    await Application.Current.MainPage.ShowPopupAsync(new AppModal("Import Failed", ex.Message, "OK"));
-            }
+
+            System.Diagnostics.Debug.WriteLine($"[MenuWiring] Import tapped, calling ReviewersPage.PerformImportAsync");
+            
+            // Call the proven ReviewersPage import logic directly
+            await ReviewersPage.PerformImportAsync(currentPage, nav);
         };
 
-        // Settings -> open ProfileSettingsPage
         menu.SettingsTapped += async (_, __) =>
         {
+            var (_, nav) = GetCurrent();
+            System.Diagnostics.Debug.WriteLine($"[MenuWiring] Settings tapped - navigating to ProfileSettingsPage");
             if (Shell.Current is not null)
                 await Navigator.GoToAsync(nameof(ProfileSettingsPage));
-            else
+            else if (nav != null)
                 await Navigator.PushAsync(new ProfileSettingsPage(), nav);
         };
-    }
-
-    /// <summary>
-    /// Parse JSON export format
-    /// </summary>
-    static (string Title, List<(string Q, string A)> Cards, string ProgressData) ParseJsonExport(string json)
-    {
-        try
-        {
-            var options = new System.Text.Json.JsonSerializerOptions
-            {
-                PropertyNameCaseInsensitive = true
-            };
-            
-            var export = System.Text.Json.JsonSerializer.Deserialize<mindvault.Models.ReviewerExport>(json, options);
-            if (export == null)
-            {
-                return ("Imported Reviewer", new List<(string, string)>(), string.Empty);
-            }
-
-            var cards = export.Cards?
-                .Select(c => (c.Question ?? string.Empty, c.Answer ?? string.Empty))
-                .ToList() ?? new List<(string, string)>();
-
-            var progressData = export.Progress?.Enabled == true && !string.IsNullOrEmpty(export.Progress?.Data)
-                ? export.Progress.Data
-                : string.Empty;
-
-            return (export.Title ?? "Imported Reviewer", cards, progressData);
-        }
-        catch (Exception ex)
-        {
-            System.Diagnostics.Debug.WriteLine($"[MenuWiring] JSON parse error: {ex.Message}");
-            throw new InvalidDataException("Invalid JSON export file format.");
-        }
+        
+        System.Diagnostics.Debug.WriteLine($"[MenuWiring] All menu handlers wired successfully");
     }
 }

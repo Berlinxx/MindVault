@@ -69,24 +69,29 @@ namespace mindvault.Controls
 
         private void OnLeftClicked(object? sender, EventArgs e)
         {
+            System.Diagnostics.Debug.WriteLine($"[InfoModal] Left button clicked, IsSingleButton={IsSingleButton}");
             // In single button mode: return true (OK clicked)
             // In two-button mode: left is Cancel, return false
             if (IsSingleButton)
             {
                 try { _tcs.TrySetResult(true); } catch { }
+                System.Diagnostics.Debug.WriteLine($"[InfoModal] Closing with result: true");
                 Close(true); // Single "OK" button
             }
             else
             {
                 try { _tcs.TrySetResult(false); } catch { }
+                System.Diagnostics.Debug.WriteLine($"[InfoModal] Closing with result: false (Cancel)");
                 Close(false); // "Cancel" button in two-button mode
             }
         }
 
         private void OnRightClicked(object? sender, EventArgs e)
         {
+            System.Diagnostics.Debug.WriteLine($"[InfoModal] Right button clicked (primary action)");
             // Right button is always the primary action (Install/OK) in two-button mode
             try { _tcs.TrySetResult(true); } catch { }
+            System.Diagnostics.Debug.WriteLine($"[InfoModal] Closing with result: true");
             Close(true);
         }
 

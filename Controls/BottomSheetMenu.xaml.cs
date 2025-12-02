@@ -54,6 +54,7 @@ public partial class BottomSheetMenu : ContentView
     // Header tap -> raise event and close
     async void OnHeaderTapped(object? s, TappedEventArgs e)
     {
+        System.Diagnostics.Debug.WriteLine($"[BottomSheetMenu] Header tapped");
         HeaderTapped?.Invoke(this, EventArgs.Empty);
         ItemSelectedCommand?.Execute("Home");
         await HideAsync();
@@ -62,6 +63,7 @@ public partial class BottomSheetMenu : ContentView
     // Item taps (raise to page, also auto-close)
     async void OnCreateTapped(object? s, TappedEventArgs e)
     {
+        System.Diagnostics.Debug.WriteLine($"[BottomSheetMenu] Create tapped");
         CreateTapped?.Invoke(this, EventArgs.Empty);
         ItemSelectedCommand?.Execute("Title Reviewer");
         await HideAsync();
@@ -69,6 +71,7 @@ public partial class BottomSheetMenu : ContentView
 
     async void OnBrowseTapped(object? s, TappedEventArgs e)
     {
+        System.Diagnostics.Debug.WriteLine($"[BottomSheetMenu] Browse tapped");
         BrowseTapped?.Invoke(this, EventArgs.Empty);
         ItemSelectedCommand?.Execute("Browse Reviewers");
         await HideAsync();
@@ -76,6 +79,7 @@ public partial class BottomSheetMenu : ContentView
 
     async void OnMultiplayerTapped(object? s, TappedEventArgs e)
     {
+        System.Diagnostics.Debug.WriteLine($"[BottomSheetMenu] Multiplayer tapped");
         MultiplayerTapped?.Invoke(this, EventArgs.Empty);
         ItemSelectedCommand?.Execute("Multiplayer Mode");
         await HideAsync();
@@ -83,6 +87,7 @@ public partial class BottomSheetMenu : ContentView
 
     async void OnImportTapped(object? s, TappedEventArgs e)
     {
+        System.Diagnostics.Debug.WriteLine($"[BottomSheetMenu] Import tapped - invoking event");
         ImportTapped?.Invoke(this, EventArgs.Empty);
         ItemSelectedCommand?.Execute("Import Page");
         await HideAsync();
@@ -90,6 +95,7 @@ public partial class BottomSheetMenu : ContentView
 
     async void OnSettingsTapped(object? s, TappedEventArgs e)
     {
+        System.Diagnostics.Debug.WriteLine($"[BottomSheetMenu] Settings tapped");
         SettingsTapped?.Invoke(this, EventArgs.Empty);
         ItemSelectedCommand?.Execute("Settings Page");
         await HideAsync();
