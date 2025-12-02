@@ -71,7 +71,12 @@ public partial class ExportPage : ContentPage
             var fileName = $"{SanitizeFileName(ReviewerTitle)}.txt";
             await SaveTextToDeviceAsync(fileName, content);
 
+            // Show the success dialog and wait for user to dismiss it
             await PageHelpers.SafeDisplayAlertAsync(this, "Export", $"Exported '{ReviewerTitle}' with progress to device storage.", "OK");
+            
+            // Add a small delay to ensure the dialog is fully dismissed before navigation
+            await Task.Delay(150);
+            
             // Go back to Reviewers page after export
             await NavigationService.ToRoot();
         }

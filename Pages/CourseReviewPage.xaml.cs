@@ -407,16 +407,78 @@ namespace mindvault.Pages
             }
         }
 
+        // === Button click guards to prevent rapid-click issues ===
+        private bool _isNavigating = false;
+        private DateTime _lastNavigationTime = DateTime.MinValue;
+        private const int MIN_NAVIGATION_DELAY_MS = 500;
+
         private async void OnCloseTapped(object? s, EventArgs e)
         {
-            await PageHelpers.SafeNavigateAsync(this, async () => await NavigationService.CloseCourseToReviewers(),
-                "Could not return to reviewers");
+            // Prevent rapid clicks
+            if (_isNavigating)
+            {
+                Debug.WriteLine("[CourseReview] Navigation already in progress, ignoring close click");
+                return;
+            }
+
+            var timeSinceLastNav = (DateTime.UtcNow - _lastNavigationTime).TotalMilliseconds;
+            if (timeSinceLastNav < MIN_NAVIGATION_DELAY_MS)
+            {
+                Debug.WriteLine($"[CourseReview] Too soon to navigate ({timeSinceLastNav}ms), ignoring");
+                return;
+            }
+
+            _isNavigating = true;
+            _lastNavigationTime = DateTime.UtcNow;
+
+            try
+            {
+                await PageHelpers.SafeNavigateAsync(this, async () => await NavigationService.CloseCourseToReviewers(),
+                    "Could not return to reviewers");
+            }
+            finally
+            {
+                // Release lock after a short delay to prevent immediate re-clicks
+                await Task.Delay(200);
+                _isNavigating = false;
+            }
         }
 
         private async void OnSettingsTapped(object? s, EventArgs e)
         {
-            var page = new ReviewerSettingsPage { ReviewerId = ReviewerId, ReviewerTitle = Title };
-            await Navigator.PushAsync(page, Navigation);
+            // Prevent rapid clicks
+            if (_isNavigating)
+            {
+                Debug.WriteLine("[CourseReview] Navigation already in progress, ignoring settings click");
+                return;
+            }
+
+            var timeSinceLastNav = (DateTime.UtcNow - _lastNavigationTime).TotalMilliseconds;
+            if (timeSinceLastNav < MIN_NAVIGATION_DELAY_MS)
+            {
+                Debug.WriteLine($"[CourseReview] Too soon to navigate ({timeSinceLastNav}ms), ignoring");
+                return;
+            }
+
+            _isNavigating = true;
+            _lastNavigationTime = DateTime.UtcNow;
+
+            try
+            {
+                var page = new ReviewerSettingsPage { ReviewerId = ReviewerId, ReviewerTitle = Title };
+                await Navigator.PushAsync(page, Navigation);
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[CourseReview] Settings navigation failed: {ex.Message}");
+                await DisplayAlert("Navigation Error", "Could not open settings", "OK");
+            }
+            finally
+            {
+                // Release lock after a short delay
+                await Task.Delay(200);
+                _isNavigating = false;
+            }
         }
 
         private async void OnImageTapped(object? s, TappedEventArgs e)

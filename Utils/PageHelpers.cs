@@ -52,7 +52,7 @@ public static class PageHelpers
     {
         try
         {
-            page.ShowPopup(new AppModal(title, message, cancel));
+            await page.ShowPopupAsync(new AppModal(title, message, cancel));
         }
         catch (Exception ex)
         {
