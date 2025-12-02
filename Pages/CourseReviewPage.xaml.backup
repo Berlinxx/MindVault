@@ -239,7 +239,7 @@
             BackgroundColor="#C5D6E4"
             IsEnabled="{Binding AnswerButtonsEnabled}"
             Style="{StaticResource Pill}"
-            ToolTipProperties.Text="Mark as incorrect (A, ←)"
+            ToolTipProperties.Text="Mark as incorrect"
             SemanticProperties.Description="Incorrect button"
             SemanticProperties.Hint="Marks this card as incorrectly answered">
             <Border.Triggers>
@@ -261,7 +261,7 @@
 
           <!-- Flip -->
           <Border Grid.Column="1" BackgroundColor="White" Style="{StaticResource Pill}" Margin="12,0"
-                  ToolTipProperties.Text="Flip card (Space, W, S, ↑, ↓)"
+                  ToolTipProperties.Text="Flip card (Space)"
                   SemanticProperties.Description="Flip card button"
                   SemanticProperties.Hint="Flips the card to show the answer or question">
             <Label Text="Flip" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}" />
@@ -277,7 +277,7 @@
             BackgroundColor="#8AB8D3"
             IsEnabled="{Binding AnswerButtonsEnabled}"
             Style="{StaticResource Pill}"
-            ToolTipProperties.Text="Mark as correct (D, →)"
+            ToolTipProperties.Text="Mark as correct"
             SemanticProperties.Description="Correct button"
             SemanticProperties.Hint="Marks this card as correctly answered">
             <Border.Triggers>

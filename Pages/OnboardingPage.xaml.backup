@@ -88,7 +88,7 @@
       <!-- Let's Go -->
       <Button x:Name="LetsGoBtn"
               Grid.ColumnSpan="2"
-              Text="Let's Go!"
+              Text="Let’s Go!"
               FontSize="18"
               CornerRadius="16"
               HeightRequest="52"

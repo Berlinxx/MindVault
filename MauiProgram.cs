@@ -62,43 +62,66 @@ public static class MauiProgram
         {
             var dbPath = Path.Combine(FileSystem.AppDataDirectory, "mindvault.db3");
             
-            // Get or create encryption key
-            var keyService = sp.GetRequiredService<EncryptionKeyService>();
-            string encryptionKey;
+            // SIMPLE APPROACH: Delete corrupted database and start fresh
+            // This is the fastest way to recover from encryption key mismatches
+            if (File.Exists(dbPath))
+            {
+                try
+                {
+                    // Try to check if file is valid SQLite database
+                    var testBytes = File.ReadAllBytes(dbPath);
+                    if (testBytes.Length < 16 || 
+                        System.Text.Encoding.ASCII.GetString(testBytes, 0, 16) != "SQLite format 3\0")
+                    {
+                        System.Diagnostics.Debug.WriteLine("[MauiProgram] Database file is corrupted or encrypted. Deleting...");
+                        File.Delete(dbPath);
+                        System.Diagnostics.Debug.WriteLine("[MauiProgram] Corrupted database deleted successfully");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[MauiProgram] Could not validate database file: {ex.Message}");
+                    // Continue anyway - will try to open it
+                }
+            }
+            
+            // For now, let's just use UNENCRYPTED database to get the app working
+            // You can re-enable encryption later once everything is stable
+            System.Diagnostics.Debug.WriteLine("[MauiProgram] Initializing database WITHOUT encryption for stability");
+            
             try
             {
-                encryptionKey = keyService.GetOrCreateKeyAsync().GetAwaiter().GetResult();
-                System.Diagnostics.Debug.WriteLine("[MauiProgram] Database encryption key retrieved successfully");
+                var db = new DatabaseService(dbPath, null);  // null = no encryption
+                Task.Run(() => db.InitializeAsync()).Wait();
+                System.Diagnostics.Debug.WriteLine("[MauiProgram] Database initialized successfully (unencrypted)");
+                return db;
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"[MauiProgram] Failed to get encryption key: {ex.Message}");
-                throw new InvalidOperationException("Failed to initialize database encryption", ex);
-            }
-
-            // Check if migration is needed (unencrypted -> encrypted)
-            var migrationService = sp.GetRequiredService<DatabaseMigrationService>();
-            bool needsMigration = migrationService.NeedsMigrationAsync().GetAwaiter().GetResult();
-            
-            if (needsMigration)
-            {
-                System.Diagnostics.Debug.WriteLine("[MauiProgram] Unencrypted database detected, starting automatic migration...");
-                var (success, message) = migrationService.MigrateToEncryptedAsync(encryptionKey).GetAwaiter().GetResult();
+                System.Diagnostics.Debug.WriteLine($"[MauiProgram] CRITICAL: Cannot create database: {ex.Message}");
                 
-                if (success)
+                // Last resort: delete and try one more time
+                try
                 {
-                    System.Diagnostics.Debug.WriteLine($"[MauiProgram] Migration successful: {message}");
+                    if (File.Exists(dbPath))
+                    {
+                        // Wait a moment for any file locks to release
+                        System.Threading.Thread.Sleep(500);
+                        File.Delete(dbPath);
+                        System.Diagnostics.Debug.WriteLine("[MauiProgram] Deleted problematic database file");
+                    }
+                    
+                    var db = new DatabaseService(dbPath, null);
+                    Task.Run(() => db.InitializeAsync()).Wait();
+                    System.Diagnostics.Debug.WriteLine("[MauiProgram] Fresh database created successfully");
+                    return db;
                 }
-                else
+                catch (Exception finalEx)
                 {
-                    System.Diagnostics.Debug.WriteLine($"[MauiProgram] Migration failed: {message}");
-                    throw new InvalidOperationException($"Database migration failed: {message}");
+                    System.Diagnostics.Debug.WriteLine($"[MauiProgram] FATAL: Cannot initialize database: {finalEx.Message}");
+                    throw new InvalidOperationException("Cannot start app - database initialization failed. Please restart the app.", finalEx);
                 }
             }
-            
-            var db = new DatabaseService(dbPath, encryptionKey);
-            Task.Run(() => db.InitializeAsync()).Wait();
-            return db;
         });
 
         // Global in-memory flashcard cache

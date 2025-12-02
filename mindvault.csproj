@@ -88,6 +88,9 @@
 	  </MauiXaml>
 	  <MauiXaml Update="Pages\AddFlashcardsPage.xaml" />
 	  <MauiXaml Update="Pages\GameOverPage.xaml" />
+	  <MauiXaml Update="Pages\OnboardingPage.xaml">
+	    <Generator>MSBuild:Compile</Generator>
+	  </MauiXaml>
 	  <MauiXaml Update="Pages\ProfileSettingsPage.xaml" />
 	  <MauiXaml Update="Pages\ReviewMistakesPage.xaml" />
 	  <MauiXaml Update="Pages\SessionSummaryPage.xaml" />
@@ -95,7 +98,6 @@
 	  <MauiXaml Update="Pages\ReviewersPage.xaml" />
 	  <MauiXaml Update="Pages\CourseReviewPage.xaml" />
 	  <MauiXaml Update="Pages\MultiplayerPage.xaml" />
-	  <MauiXaml Update="Pages\OnboardingPage.xaml" />
 	  <MauiXaml Update="Pages\ReviewerEditorPage.xaml" />
 	  <MauiXaml Update="Pages\TaglinePage.xaml" />
 	  <MauiXaml Update="Pages\ExportPage.xaml" />

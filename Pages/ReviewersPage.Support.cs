@@ -32,6 +32,58 @@ public class ReviewerCard : System.ComponentModel.INotifyPropertyChanged
     public DateTime CreatedUtc { get; set; }
     public DateTime? LastPlayedUtc { get; set; }
 
+    // Internal mastery counts - used to calculate progressive milestone
+    internal int LearnedCount { get; set; }
+    internal int SkilledCount { get; set; }
+    internal int MemorizedCount { get; set; }
+
     public string ProgressPercentText => $"{(int)(ProgressRatio * 100)}% {ProgressLabel}";
     public string DueText => $"{Due} due";
+
+    /// <summary>
+    /// Calculates progress based on progressive milestones:
+    /// - If not all cards are Learned ? track progress to Learned
+    /// - If all Learned but not all Skilled ? track progress to Skilled
+    /// - If all Skilled but not all Memorized ? track progress to Memorized
+    /// - If all Memorized ? show 100% Memorized
+    /// </summary>
+    public void CalculateProgressiveMilestone()
+    {
+        if (Questions == 0)
+        {
+            ProgressRatio = 0;
+            ProgressLabel = "Learned";
+            return;
+        }
+
+        // Check if all cards reached each milestone
+        bool allLearned = LearnedCount >= Questions;
+        bool allSkilled = SkilledCount >= Questions;
+        bool allMemorized = MemorizedCount >= Questions;
+
+        if (!allLearned)
+        {
+            // Still working on Learned milestone
+            ProgressRatio = (double)LearnedCount / Questions;
+            ProgressLabel = "Learned";
+        }
+        else if (!allSkilled)
+        {
+            // All Learned, now working on Skilled milestone
+            ProgressRatio = (double)SkilledCount / Questions;
+            ProgressLabel = "Skilled";
+        }
+        else if (!allMemorized)
+        {
+            // All Skilled, now working on Memorized milestone
+            ProgressRatio = (double)MemorizedCount / Questions;
+            ProgressLabel = "Memorized";
+        }
+        else
+        {
+            // All cards are Memorized!
+            ProgressRatio = 1.0;
+            ProgressLabel = "Memorized";
+        }
+    }
 }

@@ -7,6 +7,7 @@ using Syncfusion.Pdf.Parsing;
 using DocumentFormat.OpenXml.Packaging;
 using DocumentFormat.OpenXml.Wordprocessing;
 using System.Text.RegularExpressions;
+using mindvault.Utils;
 
 namespace mindvault.Services;
 
@@ -20,7 +21,7 @@ public class FileTextExtractor
         using var stream = await file.OpenReadAsync();
         string raw = ext switch
         {
-            ".pptx" => await ExtractPptxAsync(stream),
+            ".pptx" => await ExtractPptxAsync(stream, file.FileName),
             ".pdf"  => await ExtractPdfAsync(stream),
             ".docx" => await ExtractDocxAsync(stream),
             ".txt"  => await ExtractTxtAsync(stream),
@@ -54,7 +55,7 @@ public class FileTextExtractor
         catch { return string.Empty; }
     }
 
-    // 2. DOCX extraction via OpenXml (more robust than XML substring parsing)
+    // 2. DOCX extraction via OpenXml
     async Task<string> ExtractDocxAsync(Stream s)
     {
         try
@@ -74,34 +75,24 @@ public class FileTextExtractor
         catch { return string.Empty; }
     }
 
-    // 3. PPTX extraction via zip (unchanged with minor cleanup)
-    async Task<string> ExtractPptxAsync(Stream s)
+    // 3. PPTX extraction via cleaner (keeps only a:t runs)
+    async Task<string> ExtractPptxAsync(Stream s, string originalName)
     {
         try
         {
-            using var ms = new MemoryStream(); await s.CopyToAsync(ms); ms.Position = 0;
-            using var zip = new ZipArchive(ms, ZipArchiveMode.Read, true);
-            var sb = new StringBuilder();
-            foreach (var entry in zip.Entries.Where(e => e.FullName.StartsWith("ppt/slides/slide") && e.FullName.EndsWith(".xml")))
+            // Write to a temp file so cleaner can read ZIP structure easily
+            var tempDir = FileSystem.CacheDirectory;
+            var tempPath = Path.Combine(tempDir, $"{Path.GetFileNameWithoutExtension(originalName)}_{Guid.NewGuid():N}.pptx");
+            using (var fs = File.OpenWrite(tempPath))
             {
-                using var es = entry.Open(); using var reader = new StreamReader(es);
-                var xml = await reader.ReadToEndAsync();
-                int idx = 0;
-                while (true)
-                {
-                    var open = xml.IndexOf("<a:t", idx, StringComparison.OrdinalIgnoreCase);
-                    if (open == -1) break;
-                    open = xml.IndexOf('>', open);
-                    if (open == -1) break;
-                    var close = xml.IndexOf("</a:t>", open, StringComparison.OrdinalIgnoreCase);
-                    if (close == -1) break;
-                    var inner = xml.Substring(open + 1, close - open - 1);
-                    sb.Append(inner.Replace("&amp;", "&").Replace("&quot;", "\"")).Append(' ');
-                    idx = close + 6;
-                }
-                sb.AppendLine();
+                if (s.CanSeek) s.Position = 0;
+                await s.CopyToAsync(fs);
             }
-            return sb.ToString();
+
+            var text = PptxTextCleaner.ExtractTextClean(tempPath);
+
+            try { File.Delete(tempPath); } catch { }
+            return text;
         }
         catch { return string.Empty; }
     }

@@ -10,6 +10,7 @@ using Microsoft.Maui.Controls; // ensure ContentPage & InitializeComponent
 using mindvault.Services;
 using mindvault.Utils;
 using mindvault.Controls;
+using mindvault.Data;
 using CommunityToolkit.Maui.Views;
 
 namespace mindvault.Pages;
@@ -151,20 +152,27 @@ public partial class ReviewersPage : ContentPage
                 foreach (var r in reviewers)
                 {
                     var total = _preloader.Decks.TryGetValue(r.Id, out var cards) ? cards.Count : 0;
-                    statsMap.TryGetValue(r.Id, out var stats);
-                    int learnedRaw = stats?.Learned ?? 0;
-                    double progressRatio = (total == 0) ? 0 : (double)learnedRaw / total;
-                    list.Add(new ReviewerCard
+                    
+                    // Load SRS progress to get actual mastery counts
+                    var (learnedCount, skilledCount, memorizedCount) = LoadSrsMasteryCounts(r.Id, cards);
+                    
+                    var card = new ReviewerCard
                     {
                         Id = r.Id,
                         Title = r.Title,
                         Questions = total,
-                        ProgressRatio = progressRatio,
-                        ProgressLabel = "Learned",
+                        LearnedCount = learnedCount,
+                        SkilledCount = skilledCount,
+                        MemorizedCount = memorizedCount,
                         Due = 0,
                         CreatedUtc = r.CreatedUtc,
                         LastPlayedUtc = null
-                    });
+                    };
+                    
+                    // Calculate progressive milestone (Learned → Skilled → Memorized)
+                    card.CalculateProgressiveMilestone();
+                    
+                    list.Add(card);
                 }
                 _baseline = list;
             }
@@ -496,5 +504,64 @@ public partial class ReviewersPage : ContentPage
         }
         if (!string.IsNullOrWhiteSpace(q)) cards.Add((q, string.Empty));
         return (title, cards, progressData);
+    }
+    
+    /// <summary>
+    /// Load SRS progress data and count cards at each mastery level (Learned, Skilled, Memorized)
+    /// </summary>
+    private (int learned, int skilled, int memorized) LoadSrsMasteryCounts(int reviewerId, List<Flashcard>? cards)
+    {
+        try
+        {
+            if (cards == null || cards.Count == 0)
+                return (0, 0, 0);
+
+            // Load saved SRS progress from Preferences
+            var progressKey = $"ReviewState_{reviewerId}";
+            var payload = Preferences.Get(progressKey, null);
+            
+            if (string.IsNullOrWhiteSpace(payload))
+            {
+                // No progress saved yet - all cards are at Avail stage
+                return (0, 0, 0);
+            }
+
+            // Parse the saved progress
+            var list = System.Text.Json.JsonSerializer.Deserialize<List<System.Text.Json.JsonElement>>(payload);
+            if (list == null)
+                return (0, 0, 0);
+
+            int learnedCount = 0;
+            int skilledCount = 0;
+            int memorizedCount = 0;
+
+            foreach (var dto in list)
+            {
+                try
+                {
+                    var stageStr = dto.GetProperty("Stage").GetString();
+                    if (Enum.TryParse<mindvault.Srs.Stage>(stageStr, out var stage))
+                    {
+                        if (stage >= mindvault.Srs.Stage.Learned)
+                            learnedCount++;
+                        if (stage >= mindvault.Srs.Stage.Skilled)
+                            skilledCount++;
+                        if (stage == mindvault.Srs.Stage.Memorized)
+                            memorizedCount++;
+                    }
+                }
+                catch
+                {
+                    // Skip malformed entries
+                    continue;
+                }
+            }
+
+            return (learnedCount, skilledCount, memorizedCount);
+        }
+        catch
+        {
+            return (0, 0, 0);
+        }
     }
 }

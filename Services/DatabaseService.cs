@@ -41,11 +41,21 @@ public class DatabaseService
 
     public async Task InitializeAsync()
     {
-        await _db.CreateTableAsync<Reviewer>();
-        await _db.CreateTableAsync<Flashcard>();
-        // Try add new columns when upgrading from older schema
-        try { await _db.ExecuteAsync("ALTER TABLE Flashcard ADD COLUMN QuestionImagePath TEXT"); } catch { }
-        try { await _db.ExecuteAsync("ALTER TABLE Flashcard ADD COLUMN AnswerImagePath TEXT"); } catch { }
+        try
+        {
+            await _db.CreateTableAsync<Reviewer>();
+            await _db.CreateTableAsync<Flashcard>();
+            // Try add new columns when upgrading from older schema
+            try { await _db.ExecuteAsync("ALTER TABLE Flashcard ADD COLUMN QuestionImagePath TEXT"); } catch { }
+            try { await _db.ExecuteAsync("ALTER TABLE Flashcard ADD COLUMN AnswerImagePath TEXT"); } catch { }
+            Debug.WriteLine("[DatabaseService] Database tables created successfully");
+        }
+        catch (SQLite.SQLiteException ex)
+        {
+            Debug.WriteLine($"[DatabaseService] CRITICAL: Database initialization failed: {ex.Message}");
+            Debug.WriteLine($"[DatabaseService] This usually means encryption key mismatch or corrupted database");
+            throw new InvalidOperationException("Database initialization failed. The database may be corrupted or encrypted with a different key.", ex);
+        }
     }
 
     public Task<int> AddReviewerAsync(Reviewer reviewer) => _db.InsertAsync(reviewer);

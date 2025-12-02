@@ -17,9 +17,7 @@
         VerticalOptions="Center"
         Padding="20"
         MaximumWidthRequest="400"
-        InputTransparent="False"
-            AutomationId="AlertDialog"
-            SemanticProperties.Description="Alert dialog">
+        InputTransparent="False">
             <Grid RowDefinitions="Auto,Auto,Auto" ColumnDefinitions="*" InputTransparent="False">
                 <!-- Title -->
                 <Label
