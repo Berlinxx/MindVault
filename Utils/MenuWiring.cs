@@ -8,6 +8,7 @@ using Microsoft.Maui.Devices;
 using System.IO;
 using System.Linq;
 using System.Collections.Generic;
+using System.Security.Cryptography;
 
 namespace mindvault.Utils;
 
@@ -51,31 +52,32 @@ public static class MenuWiring
                 await Navigator.PushAsync(new MultiplayerPage(), nav);
         };
 
-        // Import -> only .txt files
+        // Import -> JSON only
         menu.ImportTapped += async (_, __) =>
         {
             try
             {
                 var fileTypes = new FilePickerFileType(new Dictionary<DevicePlatform, IEnumerable<string>>
                 {
-                    { DevicePlatform.Android, new[] { "text/plain" } },
-                    { DevicePlatform.iOS, new[] { "public.plain-text" } },
-                    { DevicePlatform.MacCatalyst, new[] { "public.plain-text" } },
-                    { DevicePlatform.WinUI, new[] { ".txt" } },
+                    { DevicePlatform.Android, new[] { "application/json" } },
+                    { DevicePlatform.iOS, new[] { "public.json" } },
+                    { DevicePlatform.MacCatalyst, new[] { "public.json" } },
+                    { DevicePlatform.WinUI, new[] { ".json" } },
                 });
 
                 var pick = await FilePicker.PickAsync(new PickOptions
                 {
-                    PickerTitle = "Select .txt export file",
+                    PickerTitle = "Select JSON export file",
                     FileTypes = fileTypes
                 });
                 if (pick is null) return;
 
-                // Extension enforcement (.txt only)
-                if (!string.Equals(Path.GetExtension(pick.FileName), ".txt", System.StringComparison.OrdinalIgnoreCase))
+                // Extension check for JSON only
+                var extension = Path.GetExtension(pick.FileName)?.ToLowerInvariant();
+                if (extension != ".json")
                 {
                     if (Application.Current?.MainPage != null)
-                        await Application.Current.MainPage.ShowPopupAsync(new AppModal("Import", "Only .txt files are supported.", "OK"));
+                        await Application.Current.MainPage.ShowPopupAsync(new AppModal("Import", "Only JSON files are supported.", "OK"));
                     return;
                 }
 
@@ -84,7 +86,46 @@ public static class MenuWiring
                 using (var reader = new StreamReader(stream))
                     content = await reader.ReadToEndAsync();
 
-                var (title, cards, progressData) = ParseExport(content);
+                // Check if encrypted
+                if (mindvault.Services.ExportEncryptionService.IsEncrypted(content))
+                {
+                    // Ask for password using built-in DisplayPromptAsync
+                    var password = await Application.Current.MainPage.DisplayPromptAsync(
+                        "Password Required",
+                        "This file is password-protected. Enter the password:",
+                        placeholder: "Password",
+                        maxLength: 50,
+                        keyboard: Keyboard.Text);
+                    
+                    if (!string.IsNullOrWhiteSpace(password))
+                    {
+                        try
+                        {
+                            content = mindvault.Services.ExportEncryptionService.Decrypt(content, password);
+                        }
+                        catch (CryptographicException)
+                        {
+                            if (Application.Current?.MainPage != null)
+                                await Application.Current.MainPage.ShowPopupAsync(new AppModal("Import Failed", "Incorrect password. The file could not be decrypted.", "OK"));
+                            return;
+                        }
+                        catch (Exception ex)
+                        {
+                            if (Application.Current?.MainPage != null)
+                                await Application.Current.MainPage.ShowPopupAsync(new AppModal("Import Failed", $"Decryption error: {ex.Message}", "OK"));
+                            return;
+                        }
+                    }
+                    else
+                    {
+                        // User cancelled password entry
+                        return;
+                    }
+                }
+
+                // Parse JSON format
+                var (title, cards, progressData) = ParseJsonExport(content);
+
                 if (cards.Count == 0)
                 {
                     if (Application.Current?.MainPage != null)
@@ -116,47 +157,38 @@ public static class MenuWiring
         };
     }
 
-    static (string Title, List<(string Q, string A)> Cards, string ProgressData) ParseExport(string content)
+    /// <summary>
+    /// Parse JSON export format
+    /// </summary>
+    static (string Title, List<(string Q, string A)> Cards, string ProgressData) ParseJsonExport(string json)
     {
-        var lines = content.Replace("\r", string.Empty).Split('\n');
-        string title = lines.FirstOrDefault(l => l.StartsWith("Reviewer:", System.StringComparison.OrdinalIgnoreCase))?.Substring(9).Trim() ?? "Imported Reviewer";
-        string progressData = string.Empty;
-        
-        // Check for progress data
-        var progressLine = lines.FirstOrDefault(l => l.StartsWith("ProgressData:", System.StringComparison.OrdinalIgnoreCase));
-        if (progressLine != null)
+        try
         {
-            progressData = progressLine.Substring(13).Trim();
+            var options = new System.Text.Json.JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            };
+            
+            var export = System.Text.Json.JsonSerializer.Deserialize<mindvault.Models.ReviewerExport>(json, options);
+            if (export == null)
+            {
+                return ("Imported Reviewer", new List<(string, string)>(), string.Empty);
+            }
+
+            var cards = export.Cards?
+                .Select(c => (c.Question ?? string.Empty, c.Answer ?? string.Empty))
+                .ToList() ?? new List<(string, string)>();
+
+            var progressData = export.Progress?.Enabled == true && !string.IsNullOrEmpty(export.Progress?.Data)
+                ? export.Progress.Data
+                : string.Empty;
+
+            return (export.Title ?? "Imported Reviewer", cards, progressData);
         }
-        
-        var cards = new List<(string Q, string A)>();
-        string? q = null;
-        foreach (var raw in lines)
+        catch (Exception ex)
         {
-            var line = raw.Trim();
-            // Skip metadata lines
-            if (line.StartsWith("Reviewer:", System.StringComparison.OrdinalIgnoreCase) ||
-                line.StartsWith("Questions:", System.StringComparison.OrdinalIgnoreCase) ||
-                line.StartsWith("Progress:", System.StringComparison.OrdinalIgnoreCase) ||
-                line.StartsWith("ProgressData:", System.StringComparison.OrdinalIgnoreCase))
-                continue;
-                
-            if (line.StartsWith("Q:", System.StringComparison.OrdinalIgnoreCase))
-            {
-                if (!string.IsNullOrWhiteSpace(q)) { cards.Add((q, string.Empty)); }
-                q = line.Substring(2).Trim();
-            }
-            else if (line.StartsWith("A:", System.StringComparison.OrdinalIgnoreCase))
-            {
-                var a = line.Substring(2).Trim();
-                if (!string.IsNullOrWhiteSpace(q) || !string.IsNullOrWhiteSpace(a))
-                {
-                    cards.Add((q ?? string.Empty, a));
-                    q = null;
-                }
-            }
+            System.Diagnostics.Debug.WriteLine($"[MenuWiring] JSON parse error: {ex.Message}");
+            throw new InvalidDataException("Invalid JSON export file format.");
         }
-        if (!string.IsNullOrWhiteSpace(q)) cards.Add((q, string.Empty));
-        return (title, cards, progressData);
     }
 }

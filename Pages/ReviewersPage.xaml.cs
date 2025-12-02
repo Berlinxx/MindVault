@@ -402,25 +402,27 @@ public partial class ReviewersPage : ContentPage
         
         try
         {
+            // JSON only
             var fileTypes = new FilePickerFileType(new Dictionary<DevicePlatform, IEnumerable<string>>
             {
-                { DevicePlatform.Android, new[] { "text/plain" } },
-                { DevicePlatform.iOS, new[] { "public.plain-text" } },
-                { DevicePlatform.MacCatalyst, new[] { "public.plain-text" } },
-                { DevicePlatform.WinUI, new[] { ".txt" } },
+                { DevicePlatform.Android, new[] { "application/json" } },
+                { DevicePlatform.iOS, new[] { "public.json" } },
+                { DevicePlatform.MacCatalyst, new[] { "public.json" } },
+                { DevicePlatform.WinUI, new[] { ".json" } },
             });
 
             var pick = await FilePicker.PickAsync(new PickOptions
             {
-                PickerTitle = "Select .txt export file",
+                PickerTitle = "Select JSON export file",
                 FileTypes = fileTypes
             });
             
             if (pick is null) return; // User cancelled
             
-            if (!string.Equals(Path.GetExtension(pick.FileName), ".txt", System.StringComparison.OrdinalIgnoreCase))
+            var extension = Path.GetExtension(pick.FileName)?.ToLowerInvariant();
+            if (extension != ".json")
             {
-                await PageHelpers.SafeDisplayAlertAsync(this, "Import", "Only .txt files are supported.", "OK");
+                await PageHelpers.SafeDisplayAlertAsync(this, "Import", "Only JSON files are supported.", "OK");
                 return;
             }
 
@@ -429,7 +431,58 @@ public partial class ReviewersPage : ContentPage
             using (var reader = new StreamReader(stream))
                 content = await reader.ReadToEndAsync();
 
-            var (title, cards, progressData) = ParseExport(content);
+            // Check if encrypted
+            if (mindvault.Services.ExportEncryptionService.IsEncrypted(content))
+            {
+                bool passwordCorrect = false;
+                
+                while (!passwordCorrect)
+                {
+                    // Ask for password using built-in DisplayPromptAsync
+                    var password = await DisplayPromptAsync(
+                        "Password Required",
+                        "This file is password-protected. Enter the password:",
+                        placeholder: "Password",
+                        maxLength: 50,
+                        keyboard: Keyboard.Text);
+                    
+                    if (string.IsNullOrWhiteSpace(password))
+                    {
+                        // User cancelled password entry
+                        return;
+                    }
+                    
+                    try
+                    {
+                        content = mindvault.Services.ExportEncryptionService.Decrypt(content, password);
+                        passwordCorrect = true;
+                    }
+                    catch (System.Security.Cryptography.CryptographicException)
+                    {
+                        var retry = await DisplayAlert(
+                            "Incorrect Password",
+                            "The password you entered is incorrect. Would you like to try again?",
+                            "Try Again",
+                            "Cancel");
+                        
+                        if (!retry)
+                        {
+                            // User chose to cancel
+                            return;
+                        }
+                        // Loop continues to ask for password again
+                    }
+                    catch (Exception ex)
+                    {
+                        await PageHelpers.SafeDisplayAlertAsync(this, "Import Failed", $"Decryption error: {ex.Message}", "OK");
+                        return;
+                    }
+                }
+            }
+
+            // Parse JSON
+            var (title, cards, progressData) = ParseJsonExport(content);
+
             if (cards.Count == 0)
             {
                 await PageHelpers.SafeDisplayAlertAsync(this, "Import", "No cards found in file.", "OK");
@@ -462,50 +515,41 @@ public partial class ReviewersPage : ContentPage
         }
     }
 
-    private (string Title, List<(string Q, string A)> Cards, string ProgressData) ParseExport(string content)
+    /// <summary>
+    /// Parse JSON export format
+    /// </summary>
+    private (string Title, List<(string Q, string A)> Cards, string ProgressData) ParseJsonExport(string json)
     {
-        var lines = content.Replace("\r", string.Empty).Split('\n');
-        string title = lines.FirstOrDefault(l => l.StartsWith("Reviewer:", StringComparison.OrdinalIgnoreCase))?.Substring(9).Trim() ?? "Imported Reviewer";
-        string progressData = string.Empty;
-        
-        // Check for progress data
-        var progressLine = lines.FirstOrDefault(l => l.StartsWith("ProgressData:", StringComparison.OrdinalIgnoreCase));
-        if (progressLine != null)
+        try
         {
-            progressData = progressLine.Substring(13).Trim();
+            var options = new System.Text.Json.JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            };
+            
+            var export = System.Text.Json.JsonSerializer.Deserialize<Models.ReviewerExport>(json, options);
+            if (export == null)
+            {
+                return ("Imported Reviewer", new List<(string, string)>(), string.Empty);
+            }
+
+            var cards = export.Cards?
+                .Select(c => (c.Question ?? string.Empty, c.Answer ?? string.Empty))
+                .ToList() ?? new List<(string, string)>();
+
+            var progressData = export.Progress?.Enabled == true && !string.IsNullOrEmpty(export.Progress?.Data)
+                ? export.Progress.Data
+                : string.Empty;
+
+            return (export.Title ?? "Imported Reviewer", cards, progressData);
         }
-        
-        var cards = new List<(string Q, string A)>();
-        string? q = null;
-        foreach (var raw in lines)
+        catch (Exception ex)
         {
-            var line = raw.Trim();
-            // Skip metadata lines
-            if (line.StartsWith("Reviewer:", StringComparison.OrdinalIgnoreCase) ||
-                line.StartsWith("Questions:", StringComparison.OrdinalIgnoreCase) ||
-                line.StartsWith("Progress:", StringComparison.OrdinalIgnoreCase) ||
-                line.StartsWith("ProgressData:", StringComparison.OrdinalIgnoreCase))
-                continue;
-                
-            if (line.StartsWith("Q:", StringComparison.OrdinalIgnoreCase))
-            {
-                if (!string.IsNullOrWhiteSpace(q)) { cards.Add((q, string.Empty)); }
-                q = line.Substring(2).Trim();
-            }
-            else if (line.StartsWith("A:", StringComparison.OrdinalIgnoreCase))
-            {
-                var a = line.Substring(2).Trim();
-                if (!string.IsNullOrWhiteSpace(q) || !string.IsNullOrWhiteSpace(a))
-                {
-                    cards.Add((q ?? string.Empty, a));
-                    q = null;
-                }
-            }
+            Debug.WriteLine($"[ReviewersPage] JSON parse error: {ex.Message}");
+            throw new InvalidDataException("Invalid JSON export file format.");
         }
-        if (!string.IsNullOrWhiteSpace(q)) cards.Add((q, string.Empty));
-        return (title, cards, progressData);
     }
-    
+
     /// <summary>
     /// Load SRS progress data and count cards at each mastery level (Learned, Skilled, Memorized)
     /// </summary>

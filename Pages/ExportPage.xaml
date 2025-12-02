@@ -104,16 +104,16 @@
                    SemanticProperties.HeadingLevel="Level2"
                    SemanticProperties.Description="Export reviewer section" />
 
-            <Label Text="Click below to export your reviewer in TXT format."
+            <Label Text="Click below to export your reviewer in JSON format."
                    FontSize="13" TextColor="{StaticResource TextPrimary}" HorizontalTextAlignment="Center"/>
 
             <Label FontSize="13" TextColor="{StaticResource TextSecondary}">
               Once exported, you can easily share the file with other users via email, messaging apps, or cloud storage.
-              Simply send the exported file, and the recipient can import it directly into their app to access your content.
+              Simply send the exported JSON file, and the recipient can import it directly into their app to access your content.
             </Label>
 
             <Label FontSize="13" TextColor="{StaticResource TextSecondary}">
-              This allows for seamless collaboration and sharing of study materials across devices!
+              Note: Exported files are unencrypted to enable easy sharing. Your local data remains securely encrypted on your device.
             </Label>
           </VerticalStackLayout>
         </Border>
@@ -153,9 +153,9 @@
             </CollectionView>
 
             <Border Style="{StaticResource PrimaryPill}"
-                    ToolTipProperties.Text="Export reviewer deck to file"
+                    ToolTipProperties.Text="Export reviewer deck to JSON file"
                     SemanticProperties.Description="Export button"
-                    SemanticProperties.Hint="Exports the reviewer deck to a text file for sharing">
+                    SemanticProperties.Hint="Exports the reviewer deck to a JSON file for sharing">
               <Label Text="EXPORT" TextColor="White" FontAttributes="Bold"
                      HorizontalOptions="Center" />
               <Border.GestureRecognizers>

@@ -7,6 +7,8 @@ using System.IO;
 using System.Collections.ObjectModel;
 using System.Linq;
 using mindvault.Models;
+using System.Text.Json;
+using CommunityToolkit.Maui.Views;
 
 namespace mindvault.Pages;
 
@@ -54,34 +56,119 @@ public partial class ExportPage : ContentPage
                 return;
             }
 
-            var lines = new List<string> { $"Reviewer: {ReviewerTitle}", $"Questions: {Cards.Count}", string.Empty };
+            Debug.WriteLine($"[ExportPage] Starting export for '{ReviewerTitle}'");
+
+            // Ask user if they want to add password protection
+            var addPassword = await this.ShowPopupAsync(
+                new Controls.InfoModal(
+                    "Password Protection",
+                    "Would you like to protect this export with a password? This is recommended for sensitive content.",
+                    "Add Password",
+                    "No Password"));
             
-            // Export progress data if available
-            var progressData = ExportProgressData();
-            if (!string.IsNullOrEmpty(progressData))
+            bool wantsPassword = addPassword is bool b && b;
+            string? password = null;
+
+            if (wantsPassword)
             {
-                lines.Add("Progress: ENABLED");
-                lines.Add($"ProgressData: {progressData}");
-                lines.Add(string.Empty);
+                // Get password from user using built-in DisplayPromptAsync
+                var pwd = await DisplayPromptAsync(
+                    "Set Password",
+                    "Enter a password to encrypt your export file:",
+                    placeholder: "Password",
+                    maxLength: 50,
+                    keyboard: Keyboard.Text);
+                
+                if (!string.IsNullOrWhiteSpace(pwd))
+                {
+                    // Confirm password
+                    var confirmPwd = await DisplayPromptAsync(
+                        "Confirm Password",
+                        "Please enter the same password again:",
+                        placeholder: "Password",
+                        maxLength: 50,
+                        keyboard: Keyboard.Text);
+                    
+                    if (pwd == confirmPwd)
+                    {
+                        password = pwd;
+                        Debug.WriteLine($"[ExportPage] Password protection enabled");
+                    }
+                    else
+                    {
+                        await PageHelpers.SafeDisplayAlertAsync(this, "Export", "Passwords don't match. Export cancelled.", "OK");
+                        return;
+                    }
+                }
+                else
+                {
+                    // User cancelled password entry
+                    return;
+                }
+            }
+
+            // Get progress data asynchronously to avoid blocking
+            var progressData = await GetProgressDataAsync();
+            Debug.WriteLine($"[ExportPage] Progress data retrieved: {(progressData != null ? "Yes" : "No")}");
+
+            // Build export model
+            var export = new ReviewerExport
+            {
+                Version = 1,
+                Title = ReviewerTitle,
+                ExportedAt = DateTime.UtcNow,
+                CardCount = Cards.Count,
+                Cards = Cards.Select(c => new FlashcardExport
+                {
+                    Question = c.Question,
+                    Answer = c.Answer
+                }).ToList(),
+                Progress = progressData
+            };
+
+            // Serialize to JSON with pretty printing
+            var options = new JsonSerializerOptions
+            {
+                WriteIndented = true,
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+            };
+            var json = JsonSerializer.Serialize(export, options);
+            Debug.WriteLine($"[ExportPage] JSON serialized, length: {json.Length}");
+
+            // Encrypt if password provided
+            if (!string.IsNullOrWhiteSpace(password))
+            {
+                json = Services.ExportEncryptionService.Encrypt(json, password);
+                Debug.WriteLine($"[ExportPage] JSON encrypted, length: {json.Length}");
+            }
+
+            var fileName = $"{SanitizeFileName(ReviewerTitle)}.json";
+            await SaveTextToDeviceAsync(fileName, json);
+            Debug.WriteLine($"[ExportPage] File saved: {fileName}");
+
+            // Only show success dialog if password was used, otherwise navigate immediately
+            if (!string.IsNullOrWhiteSpace(password))
+            {
+                var message = $"Exported '{ReviewerTitle}' with password protection to device storage.";
+                Debug.WriteLine($"[ExportPage] Showing success dialog");
+                await PageHelpers.SafeDisplayAlertAsync(this, "Export", message, "OK");
+                Debug.WriteLine($"[ExportPage] Dialog dismissed");
+            }
+            else
+            {
+                // For no password export, just navigate back immediately
+                Debug.WriteLine($"[ExportPage] No password - navigating immediately");
             }
             
-            lines.AddRange(Cards.Select(c => $"Q: {c.Question}\nA: {c.Answer}"));
-            var content = string.Join("\n\n", lines);
-
-            var fileName = $"{SanitizeFileName(ReviewerTitle)}.txt";
-            await SaveTextToDeviceAsync(fileName, content);
-
-            // Show the success dialog and wait for user to dismiss it
-            await PageHelpers.SafeDisplayAlertAsync(this, "Export", $"Exported '{ReviewerTitle}' with progress to device storage.", "OK");
-            
-            // Add a small delay to ensure the dialog is fully dismissed before navigation
-            await Task.Delay(150);
-            
-            // Go back to Reviewers page after export
+            // Navigate back
+            Debug.WriteLine($"[ExportPage] Navigating to root");
             await NavigationService.ToRoot();
+            Debug.WriteLine($"[ExportPage] Navigation complete");
         }
         catch (Exception ex)
         {
+            Debug.WriteLine($"[ExportPage] Export error: {ex.Message}");
+            Debug.WriteLine($"[ExportPage] Stack trace: {ex.StackTrace}");
             await PageHelpers.SafeDisplayAlertAsync(this, "Export Failed", ex.Message, "OK");
         }
     }
@@ -103,7 +190,7 @@ public partial class ExportPage : ContentPage
             {
                 var values = new Android.Content.ContentValues();
                 values.Put(Android.Provider.MediaStore.IMediaColumns.DisplayName, fileName);
-                values.Put(Android.Provider.MediaStore.IMediaColumns.MimeType, "text/plain");
+                values.Put(Android.Provider.MediaStore.IMediaColumns.MimeType, "application/json");
                 values.Put(Android.Provider.MediaStore.IMediaColumns.RelativePath, Android.OS.Environment.DirectoryDownloads);
 
                 var resolver = Android.App.Application.Context.ContentResolver!;
@@ -119,33 +206,33 @@ public partial class ExportPage : ContentPage
             else
             {
                 var fallbackPath = Path.Combine(FileSystem.AppDataDirectory, fileName);
-                File.WriteAllText(fallbackPath, content);
+                await File.WriteAllTextAsync(fallbackPath, content);
                 return;
             }
         }
         catch
         {
             var fallbackPath = Path.Combine(FileSystem.CacheDirectory, fileName);
-            File.WriteAllText(fallbackPath, content);
+            await File.WriteAllTextAsync(fallbackPath, content);
             return;
         }
 #elif WINDOWS
         var downloads = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads");
         Directory.CreateDirectory(downloads);
         var winPath = Path.Combine(downloads, fileName);
-        File.WriteAllText(winPath, content);
+        await File.WriteAllTextAsync(winPath, content);
 #elif IOS
         var docs = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
         var iosPath = Path.Combine(docs, fileName);
-        File.WriteAllText(iosPath, content);
+        await File.WriteAllTextAsync(iosPath, content);
 #elif MACCATALYST
         var macDownloads = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads");
         Directory.CreateDirectory(macDownloads);
         var macPath = Path.Combine(macDownloads, fileName);
-        File.WriteAllText(macPath, content);
+        await File.WriteAllTextAsync(macPath, content);
 #else
         var path = Path.Combine(FileSystem.AppDataDirectory, fileName);
-        File.WriteAllText(path, content);
+        await File.WriteAllTextAsync(path, content);
 #endif
     }
 
@@ -163,30 +250,48 @@ public partial class ExportPage : ContentPage
             "Could not go back");
     }
 
-    private string ExportProgressData()
+    private async Task<ProgressExport?> GetProgressDataAsync()
     {
         try
         {
+            Debug.WriteLine($"[ExportPage] Getting progress data for '{ReviewerTitle}'");
+            
             // Try to find the reviewer ID by title to get progress data
             var db = ServiceHelper.GetRequiredService<DatabaseService>();
-            var reviewers = db.GetReviewersAsync().GetAwaiter().GetResult();
+            var reviewers = await db.GetReviewersAsync();
+            Debug.WriteLine($"[ExportPage] Retrieved {reviewers.Count} reviewers from database");
+            
             var reviewer = reviewers.FirstOrDefault(r => r.Title == ReviewerTitle);
-            if (reviewer == null) return string.Empty;
+            if (reviewer == null)
+            {
+                Debug.WriteLine($"[ExportPage] Reviewer not found: '{ReviewerTitle}'");
+                return null;
+            }
+            
+            Debug.WriteLine($"[ExportPage] Found reviewer ID: {reviewer.Id}");
             
             // Get progress data from Preferences
             var progressKey = $"ReviewState_{reviewer.Id}";
             var progressJson = Preferences.Get(progressKey, string.Empty);
             
-            if (string.IsNullOrEmpty(progressJson)) return string.Empty;
+            if (string.IsNullOrEmpty(progressJson))
+            {
+                Debug.WriteLine($"[ExportPage] No progress data found for key: {progressKey}");
+                return null;
+            }
             
-            // Encode as base64 to avoid newline issues in file format
-            var bytes = System.Text.Encoding.UTF8.GetBytes(progressJson);
-            return Convert.ToBase64String(bytes);
+            Debug.WriteLine($"[ExportPage] Found progress data, length: {progressJson.Length}");
+            
+            return new ProgressExport
+            {
+                Enabled = true,
+                Data = progressJson
+            };
         }
         catch (Exception ex)
         {
             Debug.WriteLine($"[ExportPage] Failed to export progress: {ex.Message}");
-            return string.Empty;
+            return null;
         }
     }
 }
