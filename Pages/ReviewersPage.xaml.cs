@@ -156,6 +156,9 @@ public partial class ReviewersPage : ContentPage
                     // Load SRS progress to get actual mastery counts
                     var (learnedCount, skilledCount, memorizedCount) = LoadSrsMasteryCounts(r.Id, cards);
                     
+                    // Calculate how many cards are currently due
+                    var dueCount = CalculateDueCount(r.Id, cards);
+                    
                     var card = new ReviewerCard
                     {
                         Id = r.Id,
@@ -164,7 +167,7 @@ public partial class ReviewersPage : ContentPage
                         LearnedCount = learnedCount,
                         SkilledCount = skilledCount,
                         MemorizedCount = memorizedCount,
-                        Due = 0,
+                        Due = dueCount,
                         CreatedUtc = r.CreatedUtc,
                         LastPlayedUtc = null
                     };
@@ -609,6 +612,76 @@ public partial class ReviewersPage : ContentPage
         catch
         {
             return (0, 0, 0);
+        }
+    }
+
+    /// <summary>
+    /// Calculate how many cards are currently due for review
+    /// </summary>
+    private int CalculateDueCount(int reviewerId, List<Flashcard>? cards)
+    {
+        try
+        {
+            if (cards == null || cards.Count == 0)
+                return 0;
+
+            var now = DateTime.UtcNow;
+
+            // Load saved SRS progress from Preferences
+            var progressKey = $"ReviewState_{reviewerId}";
+            var payload = Preferences.Get(progressKey, null);
+            
+            if (string.IsNullOrWhiteSpace(payload))
+            {
+                // No progress saved yet - no cards are due, only new cards available
+                return 0;
+            }
+
+            // Parse the saved progress
+            var list = System.Text.Json.JsonSerializer.Deserialize<List<System.Text.Json.JsonElement>>(payload);
+            if (list == null)
+                return 0;
+
+            int dueCount = 0;
+
+            foreach (var dto in list)
+            {
+                try
+                {
+                    var stageStr = dto.GetProperty("Stage").GetString();
+                    
+                    // Skip cards that are still available (not yet introduced)
+                    if (stageStr == "Avail")
+                        continue;
+                    
+                    // Get the due date/time
+                    var dueAt = dto.GetProperty("DueAt").GetDateTime();
+                    
+                    // Get cooldown time if it exists
+                    DateTime cooldownUntil = now;
+                    if (dto.TryGetProperty("CooldownUntil", out var cooldownProp))
+                    {
+                        cooldownUntil = cooldownProp.GetDateTime();
+                    }
+                    
+                    // Card is due if current time is past both DueAt and CooldownUntil
+                    if (now >= dueAt && now >= cooldownUntil)
+                    {
+                        dueCount++;
+                    }
+                }
+                catch
+                {
+                    // Skip malformed entries
+                    continue;
+                }
+            }
+
+            return dueCount;
+        }
+        catch
+        {
+            return 0;
         }
     }
 }

@@ -370,6 +370,7 @@ namespace mindvault.Srs
                     c.Id,
                     Stage = c.Stage.ToString(),
                     c.DueAt,
+                    c.CooldownUntil,
                     c.Ease,
                     IntervalDays = c.Interval.TotalDays,
                     c.CorrectOnce,
@@ -415,6 +416,7 @@ namespace mindvault.Srs
                     if (card == null) continue;
                     card.Stage = Enum.TryParse<Stage>(dto.GetProperty("Stage").GetString(), out Stage st) ? st : Stage.Seen;
                     card.DueAt = dto.GetProperty("DueAt").GetDateTime();
+                    card.CooldownUntil = dto.TryGetProperty("CooldownUntil", out var cd) ? cd.GetDateTime() : card.DueAt;
                     card.Ease = dto.GetProperty("Ease").GetDouble();
                     card.Interval = TimeSpan.FromDays(dto.GetProperty("IntervalDays").GetDouble());
                     card.CorrectOnce = dto.GetProperty("CorrectOnce").GetBoolean();
