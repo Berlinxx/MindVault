@@ -77,7 +77,7 @@ public partial class ImportPage : ContentPage
                 var result = await this.ShowPopupAsync(new mindvault.Controls.InfoModal(
                     "Progress Detected",
                     "This file contains saved progress. Would you like to continue from where you left off, or start fresh?",
-                    "Continue with Progress",
+                    "Continue",
                     "Start Fresh"));
                 
                 useProgress = result is bool b && b;

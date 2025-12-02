@@ -71,23 +71,25 @@ public partial class ExportPage : ContentPage
 
             if (wantsPassword)
             {
-                // Get password from user using built-in DisplayPromptAsync
-                var pwd = await DisplayPromptAsync(
+                // Get password from user using custom modal
+                var passwordModal = new Controls.PasswordInputModal(
                     "Set Password",
                     "Enter a password to encrypt your export file:",
-                    placeholder: "Password",
-                    maxLength: 50,
-                    keyboard: Keyboard.Text);
+                    "Password");
+                
+                var pwdResult = await this.ShowPopupAsync(passwordModal);
+                var pwd = pwdResult as string;
                 
                 if (!string.IsNullOrWhiteSpace(pwd))
                 {
-                    // Confirm password
-                    var confirmPwd = await DisplayPromptAsync(
+                    // Confirm password using custom modal
+                    var confirmModal = new Controls.PasswordInputModal(
                         "Confirm Password",
                         "Please enter the same password again:",
-                        placeholder: "Password",
-                        maxLength: 50,
-                        keyboard: Keyboard.Text);
+                        "Password");
+                    
+                    var confirmResult = await this.ShowPopupAsync(confirmModal);
+                    var confirmPwd = confirmResult as string;
                     
                     if (pwd == confirmPwd)
                     {

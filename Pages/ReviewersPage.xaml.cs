@@ -438,13 +438,14 @@ public partial class ReviewersPage : ContentPage
                 
                 while (!passwordCorrect)
                 {
-                    // Ask for password using built-in DisplayPromptAsync
-                    var password = await DisplayPromptAsync(
+                    // Ask for password using custom modal
+                    var passwordModal = new Controls.PasswordInputModal(
                         "Password Required",
                         "This file is password-protected. Enter the password:",
-                        placeholder: "Password",
-                        maxLength: 50,
-                        keyboard: Keyboard.Text);
+                        "Password");
+                    
+                    var passwordResult = await this.ShowPopupAsync(passwordModal);
+                    var password = passwordResult as string;
                     
                     if (string.IsNullOrWhiteSpace(password))
                     {
@@ -459,13 +460,15 @@ public partial class ReviewersPage : ContentPage
                     }
                     catch (System.Security.Cryptography.CryptographicException)
                     {
-                        var retry = await DisplayAlert(
+                        var retry = await this.ShowPopupAsync(new Controls.InfoModal(
                             "Incorrect Password",
                             "The password you entered is incorrect. Would you like to try again?",
                             "Try Again",
-                            "Cancel");
+                            "Cancel"));
                         
-                        if (!retry)
+                        var shouldRetry = retry is bool b && b;
+                        
+                        if (!shouldRetry)
                         {
                             // User chose to cancel
                             return;

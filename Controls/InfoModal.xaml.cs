@@ -45,7 +45,7 @@ namespace mindvault.Controls
 
             // Button color logic:
             // - Single button mode: always blue
-            // - Two button mode: check if secondary is "Cancel" (red) or other text (blue)
+            // - Two button mode: check button text for color
             LeftButton.BackgroundColor = Color.FromArgb("#0D6EFD"); // Blue for single button
             
             if (!IsSingleButton)
@@ -55,9 +55,13 @@ namespace mindvault.Controls
                 LeftButtonTwo.BackgroundColor = isCancel 
                     ? Color.FromArgb("#DC3545")  // Red for Cancel
                     : Color.FromArgb("#0D6EFD"); // Blue for other secondary actions
+                
+                // Check if primary button contains "Password" for red color
+                bool isPasswordAction = primaryText?.Contains("Password", StringComparison.OrdinalIgnoreCase) == true;
+                RightButtonTwo.BackgroundColor = isPasswordAction
+                    ? Color.FromArgb("#DC3545")  // Red for "Add Password"
+                    : Color.FromArgb("#0D6EFD"); // Blue for other actions
             }
-            
-            RightButtonTwo.BackgroundColor = Color.FromArgb("#0D6EFD"); // Blue for primary action
 
             // Setup keyboard handler for Enter key
             SetupKeyboardHandler();

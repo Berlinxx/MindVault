@@ -89,13 +89,16 @@ public static class MenuWiring
                 // Check if encrypted
                 if (mindvault.Services.ExportEncryptionService.IsEncrypted(content))
                 {
-                    // Ask for password using built-in DisplayPromptAsync
-                    var password = await Application.Current.MainPage.DisplayPromptAsync(
+                    // Ask for password using custom modal
+                    var passwordModal = new PasswordInputModal(
                         "Password Required",
                         "This file is password-protected. Enter the password:",
-                        placeholder: "Password",
-                        maxLength: 50,
-                        keyboard: Keyboard.Text);
+                        "Password");
+                    
+                    var passwordResult = Application.Current?.MainPage != null 
+                        ? await Application.Current.MainPage.ShowPopupAsync(passwordModal)
+                        : null;
+                    var password = passwordResult as string;
                     
                     if (!string.IsNullOrWhiteSpace(password))
                     {
