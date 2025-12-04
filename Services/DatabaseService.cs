@@ -18,24 +18,25 @@ public class DatabaseService
     /// Creates a new DatabaseService with SQLCipher encryption.
     /// </summary>
     /// <param name="dbPath">Path to the database file</param>
-    /// <param name="encryptionKey">Encryption key for SQLCipher (Base64 encoded)</param>
+    /// <param name="encryptionKey">Encryption key for SQLCipher (required for security)</param>
     public DatabaseService(string dbPath, string? encryptionKey = null)
     {
-        // SQLCipher connection string with encryption
-        if (!string.IsNullOrEmpty(encryptionKey))
+        if (string.IsNullOrEmpty(encryptionKey))
         {
+            // For capstone, we require encryption
+            Debug.WriteLine("[DatabaseService] WARNING: No encryption key provided - using unencrypted database");
+            _db = new SQLiteAsyncConnection(dbPath);
+        }
+        else
+        {
+            // Use SQLCipher for encrypted database
             var connectionString = new SQLiteConnectionString(dbPath, 
                 SQLiteOpenFlags.ReadWrite | SQLiteOpenFlags.Create | SQLiteOpenFlags.FullMutex,
                 storeDateTimeAsTicks: true,
                 key: encryptionKey);
+            
             _db = new SQLiteAsyncConnection(connectionString);
-            Debug.WriteLine("[DatabaseService] Database initialized with SQLCipher encryption");
-        }
-        else
-        {
-            // Fallback to unencrypted (not recommended for production)
-            _db = new SQLiteAsyncConnection(dbPath);
-            Debug.WriteLine("[DatabaseService] WARNING: Database initialized WITHOUT encryption");
+            Debug.WriteLine("[DatabaseService] Database initialized with AES-256 encryption (SQLCipher)");
         }
     }
 

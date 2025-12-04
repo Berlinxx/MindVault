@@ -10,8 +10,7 @@ public static class MauiProgram
 {
     public static MauiApp CreateMauiApp()
     {
-        // Initialize SQLCipher before any database operations
-        // The bundle_e_sqlcipher package automatically provides the encrypted SQLite provider
+        // Initialize SQLCipher for encrypted database support
         SQLitePCL.Batteries_V2.Init();
         
         var builder = MauiApp.CreateBuilder();
@@ -51,76 +50,81 @@ public static class MauiProgram
 #endif
                });
 
-        // Encryption key service (must be registered first)
-        builder.Services.AddSingleton<EncryptionKeyService>();
-
-        // Database migration service
+        // Database migration service (for future use if needed)
         builder.Services.AddSingleton<DatabaseMigrationService>();
 
-        // Database service with encryption
+        // Database service WITH encryption (for capstone security requirements)
         builder.Services.AddSingleton(sp =>
         {
             var dbPath = Path.Combine(FileSystem.AppDataDirectory, "mindvault.db3");
             
-            // SIMPLE APPROACH: Delete corrupted database and start fresh
-            // This is the fastest way to recover from encryption key mismatches
+            System.Diagnostics.Debug.WriteLine("[MauiProgram] Initializing encrypted database");
+            System.Diagnostics.Debug.WriteLine($"[MauiProgram] Database path: {dbPath}");
+            
+            // CRITICAL FIX: Delete old unencrypted database BEFORE trying to open it
             if (File.Exists(dbPath))
             {
                 try
                 {
-                    // Try to check if file is valid SQLite database
-                    var testBytes = File.ReadAllBytes(dbPath);
-                    if (testBytes.Length < 16 || 
-                        System.Text.Encoding.ASCII.GetString(testBytes, 0, 16) != "SQLite format 3\0")
+                    System.Diagnostics.Debug.WriteLine("[MauiProgram] Found existing database file - checking if it's unencrypted");
+                    
+                    // Try to read the file header to check if it's an unencrypted SQLite file
+                    var fileBytes = File.ReadAllBytes(dbPath);
+                    if (fileBytes.Length >= 16)
                     {
-                        System.Diagnostics.Debug.WriteLine("[MauiProgram] Database file is corrupted or encrypted. Deleting...");
-                        File.Delete(dbPath);
-                        System.Diagnostics.Debug.WriteLine("[MauiProgram] Corrupted database deleted successfully");
+                        var header = System.Text.Encoding.ASCII.GetString(fileBytes, 0, 16);
+                        if (header.StartsWith("SQLite format 3"))
+                        {
+                            // This is an UNENCRYPTED database - delete it immediately
+                            System.Diagnostics.Debug.WriteLine("[MauiProgram] Detected UNENCRYPTED database - deleting it now");
+                            File.Delete(dbPath);
+                            System.Diagnostics.Debug.WriteLine("[MauiProgram] Old unencrypted database deleted successfully");
+                        }
+                        else
+                        {
+                            System.Diagnostics.Debug.WriteLine("[MauiProgram] Database appears to be encrypted already");
+                        }
                     }
                 }
                 catch (Exception ex)
                 {
-                    System.Diagnostics.Debug.WriteLine($"[MauiProgram] Could not validate database file: {ex.Message}");
-                    // Continue anyway - will try to open it
+                    System.Diagnostics.Debug.WriteLine($"[MauiProgram] Could not check database file: {ex.Message}");
+                    // If we can't read it, try to delete it anyway
+                    try
+                    {
+                        File.Delete(dbPath);
+                        System.Diagnostics.Debug.WriteLine("[MauiProgram] Deleted problematic database file");
+                    }
+                    catch { }
                 }
             }
             
-            // For now, let's just use UNENCRYPTED database to get the app working
-            // You can re-enable encryption later once everything is stable
-            System.Diagnostics.Debug.WriteLine("[MauiProgram] Initializing database WITHOUT encryption for stability");
-            
+            // Get encryption key from secure storage
+            string? encryptionKey = null;
             try
             {
-                var db = new DatabaseService(dbPath, null);  // null = no encryption
+                encryptionKey = Task.Run(() => EncryptionKeyManager.GetOrCreateEncryptionKeyAsync()).Result;
+                System.Diagnostics.Debug.WriteLine("[MauiProgram] Encryption key retrieved successfully");
+                System.Diagnostics.Debug.WriteLine($"[MauiProgram] Key storage: {EncryptionKeyManager.GetStorageLocationInfo()}");
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[MauiProgram] ERROR: Failed to get encryption key: {ex.Message}");
+                throw new InvalidOperationException("Cannot initialize database encryption. This is required for security.", ex);
+            }
+            
+            // Try to initialize encrypted database
+            try
+            {
+                var db = new DatabaseService(dbPath, encryptionKey);
                 Task.Run(() => db.InitializeAsync()).Wait();
-                System.Diagnostics.Debug.WriteLine("[MauiProgram] Database initialized successfully (unencrypted)");
+                System.Diagnostics.Debug.WriteLine("[MauiProgram] Encrypted database initialized successfully");
                 return db;
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"[MauiProgram] CRITICAL: Cannot create database: {ex.Message}");
-                
-                // Last resort: delete and try one more time
-                try
-                {
-                    if (File.Exists(dbPath))
-                    {
-                        // Wait a moment for any file locks to release
-                        System.Threading.Thread.Sleep(500);
-                        File.Delete(dbPath);
-                        System.Diagnostics.Debug.WriteLine("[MauiProgram] Deleted problematic database file");
-                    }
-                    
-                    var db = new DatabaseService(dbPath, null);
-                    Task.Run(() => db.InitializeAsync()).Wait();
-                    System.Diagnostics.Debug.WriteLine("[MauiProgram] Fresh database created successfully");
-                    return db;
-                }
-                catch (Exception finalEx)
-                {
-                    System.Diagnostics.Debug.WriteLine($"[MauiProgram] FATAL: Cannot initialize database: {finalEx.Message}");
-                    throw new InvalidOperationException("Cannot start app - database initialization failed. Please restart the app.", finalEx);
-                }
+                throw new InvalidOperationException($"Cannot start app - encrypted database initialization failed: {ex.Message}", ex);
             }
         });
 
