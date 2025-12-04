@@ -15,6 +15,7 @@ public static class ProfileState
     const string NameKey = "ProfileName";
     const string AvatarKey = "ProfileAvatar";
     const string GenderKey = "ProfileGender";
+    const string DeveloperToolsKey = "DeveloperToolsEnabled";
 
     public static string Name
     {
@@ -32,6 +33,12 @@ public static class ProfileState
     {
         get => (ProfileGender)Preferences.Get(GenderKey, (int)ProfileGender.Unknown);
         set => Preferences.Set(GenderKey, (int)value);
+    }
+    
+    public static bool DeveloperToolsEnabled
+    {
+        get => Preferences.Get(DeveloperToolsKey, false);
+        set => Preferences.Set(DeveloperToolsKey, value);
     }
 
     public static bool HasName => !string.IsNullOrWhiteSpace(Name);

@@ -22,6 +22,12 @@ public partial class ProfileSettingsPage : ContentPage
     }
 
     ProfileGender _selectedGender = ProfileGender.Unknown;
+    
+    // Developer Tools unlock mechanism
+    private int _avatarTapCount = 0;
+    private DateTime _lastAvatarTap = DateTime.MinValue;
+    private const int TAPS_REQUIRED = 8;
+    private const int TAP_TIMEOUT_SECONDS = 3;
 
     public ProfileSettingsPage()
     {
@@ -56,6 +62,46 @@ public partial class ProfileSettingsPage : ContentPage
     void OnFemaleTapped(object? sender, TappedEventArgs e) => SelectGender(ProfileGender.Female);
     void OnMaleTapped(object? sender, TappedEventArgs e) => SelectGender(ProfileGender.Male);
     void OnOtherTapped(object? sender, TappedEventArgs e) => SelectGender(ProfileGender.Other);
+    
+    private async void OnAvatarTapped(object? sender, TappedEventArgs e)
+    {
+        var now = DateTime.UtcNow;
+        
+        // Reset counter if too much time has passed
+        if ((now - _lastAvatarTap).TotalSeconds > TAP_TIMEOUT_SECONDS)
+        {
+            _avatarTapCount = 0;
+        }
+        
+        _avatarTapCount++;
+        _lastAvatarTap = now;
+        
+        System.Diagnostics.Debug.WriteLine($"[ProfileSettings] Avatar tapped {_avatarTapCount}/{TAPS_REQUIRED} times");
+        
+        if (_avatarTapCount >= TAPS_REQUIRED)
+        {
+            _avatarTapCount = 0; // Reset counter
+            
+            if (!ProfileState.DeveloperToolsEnabled)
+            {
+                ProfileState.DeveloperToolsEnabled = true;
+                await this.ShowPopupAsync(new AppModal(
+                    "Developer Mode",
+                    "Developer Tools have been unlocked! You can now access them from the menu.",
+                    "OK"
+                ));
+                System.Diagnostics.Debug.WriteLine("[ProfileSettings] Developer Tools ENABLED");
+            }
+            else
+            {
+                await this.ShowPopupAsync(new AppModal(
+                    "Developer Mode",
+                    "Developer Tools are already enabled. You can disable them from the Developer Tools page.",
+                    "OK"
+                ));
+            }
+        }
+    }
 
     private async void OnSaveClicked(object? sender, EventArgs e)
     {

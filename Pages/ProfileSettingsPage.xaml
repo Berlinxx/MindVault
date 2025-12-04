@@ -41,6 +41,9 @@
           <Border StrokeThickness="0" StrokeShape="Ellipse" BackgroundColor="#F0F0F0">
             <Image Source="{Binding SelectedAvatar}" Aspect="AspectFill"/>
           </Border>
+          <Border.GestureRecognizers>
+            <TapGestureRecognizer Tapped="OnAvatarTapped"/>
+          </Border.GestureRecognizers>
         </Border>
 
         <!-- Avatar picker -->

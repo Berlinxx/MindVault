@@ -83,7 +83,10 @@
         </Grid>
 
         <!-- Developer Tools (Hidden Feature) -->
-        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
+        <Grid x:Name="DeveloperToolsItem"
+              ColumnDefinitions="Auto,*" 
+              ColumnSpacing="8"
+              IsVisible="False">
           <Label Text="&#xF0AD;" FontFamily="FontAwesome6FreeSolid" FontSize="18" TextColor="#FF6B6B" VerticalOptions="Center"/>
           <Label Grid.Column="1" Text="Developer Tools" FontSize="16" TextColor="#FF6B6B" FontAttributes="Italic" />
           <Grid.GestureRecognizers><TapGestureRecognizer Tapped="OnDeveloperToolsTapped"/></Grid.GestureRecognizers>

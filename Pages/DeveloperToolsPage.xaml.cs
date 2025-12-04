@@ -16,6 +16,42 @@ public partial class DeveloperToolsPage : ContentPage
         _resetService = ServiceHelper.GetRequiredService<AppDataResetService>();
         LoadDatabaseInfo();
         RefreshUsageInfo();
+        
+        // Initialize the Developer Mode switch state
+        DeveloperModeSwitch.IsToggled = ProfileState.DeveloperToolsEnabled;
+    }
+    
+    private async void OnDeveloperModeToggled(object? sender, ToggledEventArgs e)
+    {
+        if (!e.Value)
+        {
+            // User is trying to disable Developer Tools
+            var confirm = await this.ShowPopupAsync(
+                new AppModal(
+                    "Disable Developer Tools",
+                    "This will hide Developer Tools from the menu.\n\nTo re-enable, go to Settings and tap the avatar 8 times.",
+                    "Disable",
+                    "Cancel"));
+
+            if (confirm is bool b && b)
+            {
+                ProfileState.DeveloperToolsEnabled = false;
+                ShowStatus("Developer Tools disabled. Tap avatar 8x in Settings to re-enable.");
+                Debug.WriteLine("[DeveloperTools] Developer Tools DISABLED");
+            }
+            else
+            {
+                // User cancelled, restore toggle state
+                DeveloperModeSwitch.IsToggled = true;
+            }
+        }
+        else
+        {
+            // Re-enabling
+            ProfileState.DeveloperToolsEnabled = true;
+            ShowStatus("Developer Tools enabled");
+            Debug.WriteLine("[DeveloperTools] Developer Tools ENABLED");
+        }
     }
 
     private void LoadDatabaseInfo()

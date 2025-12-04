@@ -66,18 +66,28 @@ namespace mindvault.Services
                     try { Directory.Delete(destinationPath, true); } catch { }
                 }
                 Directory.CreateDirectory(destinationPath);
+                
                 await Task.Run(() =>
                 {
                     using var archive = ZipFile.OpenRead(zipPath);
+                    var totalEntries = archive.Entries.Count;
+                    var extractedCount = 0;
+                    
                     foreach (var entry in archive.Entries)
                     {
                         ct.ThrowIfCancellationRequested();
+                        
                         var path = Path.Combine(destinationPath, entry.FullName);
                         var dir = Path.GetDirectoryName(path);
                         if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
                         if (!string.IsNullOrEmpty(entry.Name)) entry.ExtractToFile(path, overwrite: true);
+                        
+                        extractedCount++;
+                        var percentage = (int)((extractedCount / (double)totalEntries) * 100);
+                        progress?.Report($"Extracting Python ({percentage}%)...");
                     }
                 }, ct);
+                
                 var exe = ResolveExistingPythonPath();
                 return !string.IsNullOrEmpty(exe) && File.Exists(exe);
             }

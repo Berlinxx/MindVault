@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.Windows.Input;
+using mindvault.Services;
 
 namespace mindvault.Controls;
 
@@ -25,6 +26,9 @@ public partial class BottomSheetMenu : ContentView
 
     public async Task ShowAsync()
     {
+        // Update Developer Tools visibility based on ProfileState
+        DeveloperToolsItem.IsVisible = ProfileState.DeveloperToolsEnabled;
+        
         IsVisible = true;
         Overlay.Opacity = 0;
         Sheet.TranslationY = 420;
