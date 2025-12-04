@@ -5,6 +5,20 @@ Write-Host "================================" -ForegroundColor Cyan
 Write-Host " MindVault Data Reset Utility" -ForegroundColor Cyan
 Write-Host "================================" -ForegroundColor Cyan
 Write-Host ""
+Write-Host "WARNING: This will delete ALL app data!" -ForegroundColor Yellow
+Write-Host "  - All flashcards and decks" -ForegroundColor Gray
+Write-Host "  - All settings and preferences" -ForegroundColor Gray
+Write-Host "  - Python environment" -ForegroundColor Gray
+Write-Host "  - Onboarding/Profile state" -ForegroundColor Gray
+Write-Host ""
+
+$continue = Read-Host "Continue? (y/N)"
+if ($continue -ne "y" -and $continue -ne "Y") {
+    Write-Host "Cancelled." -ForegroundColor Gray
+    exit
+}
+
+Write-Host ""
 
 # 1. Delete LocalApplicationData
 $localAppData = "$env:LOCALAPPDATA\MindVault"
@@ -27,32 +41,14 @@ if ($mindvaultPackages) {
         $pkgPath = $pkg.FullName
         Write-Host "  ? Found: $($pkg.Name)" -ForegroundColor Cyan
         
-        # Delete LocalState (database)
-        $localState = Join-Path $pkgPath "LocalState"
-        if (Test-Path $localState) {
-            Remove-Item -Recurse -Force $localState -ErrorAction SilentlyContinue
-            Write-Host "    ? Deleted LocalState" -ForegroundColor Green
+        # Delete entire package directory (includes LocalState, Settings, etc.)
+        try {
+            Remove-Item -Recurse -Force $pkgPath -ErrorAction Stop
+            Write-Host "    ? Deleted entire package" -ForegroundColor Green
         }
-        
-        # Delete LocalCache
-        $localCache = Join-Path $pkgPath "LocalCache"
-        if (Test-Path $localCache) {
-            Remove-Item -Recurse -Force $localCache -ErrorAction SilentlyContinue
-            Write-Host "    ? Deleted LocalCache" -ForegroundColor Green
-        }
-        
-        # Delete Settings
-        $settings = Join-Path $pkgPath "Settings"
-        if (Test-Path $settings) {
-            Remove-Item -Recurse -Force $settings -ErrorAction SilentlyContinue
-            Write-Host "    ? Deleted Settings" -ForegroundColor Green
-        }
-        
-        # Delete TempState
-        $tempState = Join-Path $pkgPath "TempState"
-        if (Test-Path $tempState) {
-            Remove-Item -Recurse -Force $tempState -ErrorAction SilentlyContinue
-            Write-Host "    ? Deleted TempState" -ForegroundColor Green
+        catch {
+            Write-Host "    ? Could not delete package (app might be running)" -ForegroundColor Red
+            Write-Host "      Error: $($_.Exception.Message)" -ForegroundColor Red
         }
     }
 } else {
@@ -78,13 +74,42 @@ foreach ($pattern in $vsDebugPaths) {
     }
 }
 
+# 4. Clear Windows Registry Preferences (if any)
+Write-Host ""
+Write-Host "? Checking Windows Registry..." -ForegroundColor Yellow
+$regPaths = @(
+    "HKCU:\Software\mindvault",
+    "HKCU:\Software\com.companyname.mindvault"
+)
+
+foreach ($regPath in $regPaths) {
+    if (Test-Path $regPath) {
+        Write-Host "  ? Found registry key: $regPath" -ForegroundColor Cyan
+        try {
+            Remove-Item -Path $regPath -Recurse -Force -ErrorAction Stop
+            Write-Host "    ? Deleted registry key" -ForegroundColor Green
+        }
+        catch {
+            Write-Host "    ? Could not delete registry key" -ForegroundColor Red
+        }
+    }
+}
+
 Write-Host ""
 Write-Host "================================" -ForegroundColor Cyan
 Write-Host " ? Reset Complete!" -ForegroundColor Green
 Write-Host "================================" -ForegroundColor Cyan
 Write-Host ""
 Write-Host "All app data has been deleted." -ForegroundColor White
-Write-Host "Next time you run the app, it will be like a fresh install." -ForegroundColor White
+Write-Host ""
+Write-Host "NEXT STEPS:" -ForegroundColor Yellow
+Write-Host "  1. Close Visual Studio (if open)" -ForegroundColor White
+Write-Host "  2. Rebuild the solution (Clean + Rebuild)" -ForegroundColor White
+Write-Host "  3. Run the app - you'll see:" -ForegroundColor White
+Write-Host "     - TaglinePage (splash screen)" -ForegroundColor Cyan
+Write-Host "     - OnboardingPage (swipeable tutorial)" -ForegroundColor Cyan
+Write-Host "     - SetProfilePage (avatar + username)" -ForegroundColor Cyan
+Write-Host "     - HomePage (main menu)" -ForegroundColor Cyan
 Write-Host ""
 Write-Host "Press any key to close..." -ForegroundColor Gray
 $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")

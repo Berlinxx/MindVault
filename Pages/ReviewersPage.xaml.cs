@@ -699,4 +699,20 @@ public partial class ReviewersPage : ContentPage
             return 0;
         }
     }
+
+    /// <summary>
+    /// Hidden Developer Tools - Triple-tap the REVIEWERS title to access
+    /// </summary>
+    private async void OnTitleTripleTapped(object? sender, TappedEventArgs e)
+    {
+        try
+        {
+            Debug.WriteLine("[ReviewersPage] Developer Tools accessed via triple-tap");
+            await Navigator.PushAsync(new DeveloperToolsPage(), Navigation);
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[ReviewersPage] Failed to open Developer Tools: {ex.Message}");
+        }
+    }
 }

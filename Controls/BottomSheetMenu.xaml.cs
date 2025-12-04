@@ -11,6 +11,7 @@ public partial class BottomSheetMenu : ContentView
     public event EventHandler? SettingsTapped; // replaced ExportTapped
     public event EventHandler? MultiplayerTapped; // NEW
     public event EventHandler? HeaderTapped; // Mind Vault header tap
+    public event EventHandler? DeveloperToolsTapped; // NEW - Developer Tools
 
     public ObservableCollection<string> Items { get; } = new();
     public static readonly BindableProperty ItemSelectedCommandProperty =
@@ -98,6 +99,14 @@ public partial class BottomSheetMenu : ContentView
         System.Diagnostics.Debug.WriteLine($"[BottomSheetMenu] Settings tapped");
         SettingsTapped?.Invoke(this, EventArgs.Empty);
         ItemSelectedCommand?.Execute("Settings Page");
+        await HideAsync();
+    }
+
+    async void OnDeveloperToolsTapped(object? s, TappedEventArgs e)
+    {
+        System.Diagnostics.Debug.WriteLine($"[BottomSheetMenu] Developer Tools tapped");
+        DeveloperToolsTapped?.Invoke(this, EventArgs.Empty);
+        ItemSelectedCommand?.Execute("Developer Tools");
         await HideAsync();
     }
 }

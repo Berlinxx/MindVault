@@ -39,6 +39,10 @@
                     ItemsSource="{Binding Slides}"
                     IndicatorView="{x:Reference Indicators}"
                     IsSwipeEnabled="True"
+                    Loop="False"
+                    HorizontalScrollBarVisibility="Never"
+                    VerticalScrollBarVisibility="Never"
+                    PeekAreaInsets="0"
                     VerticalOptions="Fill"
                     HorizontalOptions="Fill"
                     PositionChanged="OnPositionChanged"
@@ -64,6 +68,8 @@
                      Text="{Binding Subtitle}"
                      FontSize="16"
                      Opacity="0.9"
+                     LineBreakMode="WordWrap"
+                     Margin="0,0,0,16"
                      TextColor="White" />
             </Grid>
           </DataTemplate>
@@ -94,7 +100,8 @@
               HeightRequest="52"
               BackgroundColor="White"
               TextColor="#0D63B6"
-              IsVisible="False"
+              Opacity="0"
+              IsEnabled="False"
               Clicked="OnLetsGo" />
 
       <!-- Next FAB -->
@@ -105,6 +112,8 @@
               CornerRadius="28"
               Margin="12,0,0,0"
               BackgroundColor="white"
+              Opacity="1"
+              IsEnabled="True"
               Clicked="OnNext"
               HorizontalOptions="End"
               VerticalOptions="Center"

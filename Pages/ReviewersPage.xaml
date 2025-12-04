@@ -85,7 +85,11 @@
         <Label Grid.Column="1" Text="REVIEWERS"
                FontAttributes="Bold" FontSize="18"
                TextColor="{StaticResource TextPrimary}"
-               VerticalOptions="Center" HorizontalOptions="Start"/>
+               VerticalOptions="Center" HorizontalOptions="Start">
+          <Label.GestureRecognizers>
+            <TapGestureRecognizer Tapped="OnTitleTripleTapped" NumberOfTapsRequired="3" />
+          </Label.GestureRecognizers>
+        </Label>
 
         <!-- Search circle -->
         <Border Grid.Column="2" WidthRequest="34" HeightRequest="34"

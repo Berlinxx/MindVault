@@ -40,9 +40,16 @@ public partial class OnboardingPage : ContentPage
     void UpdateButtons()
     {
         bool isLast = Carousel.Position >= Slides.Count - 1;
-        NextBtn.IsVisible   = !isLast;
-        LetsGoBtn.IsVisible = isLast;
-        SkipBtn.IsVisible   = !isLast;
+        
+        // Use Opacity instead of IsVisible to prevent layout shifts
+        NextBtn.Opacity = isLast ? 0 : 1;
+        NextBtn.IsEnabled = !isLast;
+        
+        LetsGoBtn.Opacity = isLast ? 1 : 0;
+        LetsGoBtn.IsEnabled = isLast;
+        
+        SkipBtn.Opacity = isLast ? 0 : 1;
+        SkipBtn.IsEnabled = !isLast;
     }
 
     void OnNext(object sender, EventArgs e)
@@ -79,6 +86,10 @@ public partial class OnboardingPage : ContentPage
     protected override async void OnAppearing()
     {
         base.OnAppearing();
+        
+        // Reset the acted flag so buttons work after reset
+        _acted = false;
+        
         await mindvault.Utils.AnimHelpers.SlideFadeInAsync(Content);
     }
 }

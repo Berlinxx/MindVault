@@ -99,6 +99,14 @@ public static class MenuWiring
                 await Navigator.PushAsync(new ProfileSettingsPage(), nav);
         };
         
+        menu.DeveloperToolsTapped += async (_, __) =>
+        {
+            var (_, nav) = GetCurrent();
+            System.Diagnostics.Debug.WriteLine($"[MenuWiring] Developer Tools tapped - navigating to DeveloperToolsPage");
+            if (nav != null)
+                await Navigator.PushAsync(new DeveloperToolsPage(), nav);
+        };
+        
         System.Diagnostics.Debug.WriteLine($"[MenuWiring] All menu handlers wired successfully");
     }
 }

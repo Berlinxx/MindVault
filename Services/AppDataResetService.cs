@@ -24,11 +24,18 @@ public class AppDataResetService
         {
             Debug.WriteLine("[AppDataReset] Starting complete app data reset...");
             
-            // 1. Clear Preferences
+            // 1. Clear Preferences (MUST BE FIRST)
             Debug.WriteLine("[AppDataReset] Clearing preferences...");
             Preferences.Clear();
             
-            // 2. Delete Database
+            // 2. Clear specific onboarding/profile state
+            Debug.WriteLine("[AppDataReset] Resetting onboarding and profile state...");
+            OnboardingState.IsCompleted = false;
+            ProfileState.Name = null;
+            ProfileState.Avatar = null;
+            ProfileState.Gender = ProfileGender.Unknown;
+            
+            // 3. Delete Database
             Debug.WriteLine("[AppDataReset] Deleting database...");
             var dbPath = Path.Combine(FileSystem.AppDataDirectory, "mindvault.db3");
             var backupPath = Path.Combine(FileSystem.AppDataDirectory, "mindvault_backup_unencrypted.db3");
@@ -45,7 +52,7 @@ public class AppDataResetService
                 catch (Exception ex) { Debug.WriteLine($"[AppDataReset] Failed to delete backup: {ex.Message}"); }
             }
             
-            // 3. Delete LocalApplicationData (Python, models, etc.)
+            // 4. Delete LocalApplicationData (Python, models, etc.)
             Debug.WriteLine("[AppDataReset] Deleting LocalApplicationData...");
             var localAppData = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "MindVault");
             
@@ -64,18 +71,18 @@ public class AppDataResetService
                 }
             }
             
-            // 4. Delete AppDataDirectory contents (images, cache, etc.)
+            // 5. Delete AppDataDirectory contents (images, cache, etc.)
             Debug.WriteLine("[AppDataReset] Clearing AppDataDirectory...");
             var appDataDir = FileSystem.AppDataDirectory;
             await DeleteDirectoryContentsAsync(appDataDir, preserveDirectory: true);
             
-            // 5. Delete Cache Directory
+            // 6. Delete Cache Directory
             Debug.WriteLine("[AppDataReset] Clearing CacheDirectory...");
             var cacheDir = FileSystem.CacheDirectory;
             await DeleteDirectoryContentsAsync(cacheDir, preserveDirectory: true);
             
             Debug.WriteLine("[AppDataReset] Reset complete!");
-            return (true, "All app data has been deleted successfully. The app will now close.");
+            return (true, "All app data has been deleted successfully. Please restart the app to see the onboarding screens.");
         }
         catch (Exception ex)
         {
