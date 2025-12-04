@@ -135,6 +135,7 @@ public static class MauiProgram
         builder.Services.AddSingleton<FileTextExtractor>();
         builder.Services.AddSingleton<PythonFlashcardService>();
         builder.Services.AddSingleton<MultiplayerService>();
+        builder.Services.AddSingleton<AppDataResetService>(); // Data reset utility
 
 #if DEBUG
         builder.Logging.AddDebug();

@@ -39,6 +39,7 @@
 
   <!-- Reviewer Editor -->
   <ShellContent Route="ReviewerEditorPage"
+                
                 ContentTemplate="{DataTemplate pages:ReviewerEditorPage}" />
 
   <!-- Add Flashcards -->
