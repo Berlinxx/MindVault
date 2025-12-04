@@ -109,6 +109,10 @@
 
 	<!-- AI-related files: Windows only (Android/iOS/macOS don't support Python AI) -->
 	<ItemGroup>
+		<!-- Bundle python311.zip for extraction to LocalAppData -->
+		<Content Include="python311.zip" Condition="$(TargetFramework.Contains('windows'))">
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+		</Content>
 		<Content Include="Models\mindvault_qwen2_0.5b_q4_k_m.gguf" Condition="$(TargetFramework.Contains('windows'))">
 			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
 		</Content>
@@ -116,13 +120,8 @@
 			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
 		</Content>
 		<!-- Bundle llama-cpp-python wheel for Windows offline installation -->
-		<Content Include="Wheels\llama_cpp_python-*.whl" Condition="$(TargetFramework.Contains('windows'))">
+		<Content Include="Wheels\**\*.whl" Condition="$(TargetFramework.Contains('windows'))">
 			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
-		</Content>
-		<!-- Bundle complete Python311 distribution with all dependencies -->
-		<Content Include="Python311\**\*" Condition="$(TargetFramework.Contains('windows'))" Exclude="Python311\**\*.cs">
-			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-			<Link>Python311\%(RecursiveDir)%(Filename)%(Extension)</Link>
 		</Content>
 	</ItemGroup>
 

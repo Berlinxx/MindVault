@@ -457,7 +457,7 @@ public partial class AddFlashcardsPage : ContentPage
             // Navigate to editor to allow user to review/edit imported cards
             await Shell.Current.GoToAsync($"///ReviewerEditorPage?id={ReviewerId}&title={Uri.EscapeDataString(ReviewerTitle)}");
         }
-        catch (Exception ex) 
+        catch (Exception ex)
         { 
             await DisplayAlert("Import Failed", ex.Message, "OK");
             System.Diagnostics.Debug.WriteLine($"[AddFlashcardsPage] Import error: {ex}");
@@ -618,16 +618,8 @@ public partial class AddFlashcardsPage : ContentPage
 
     static async Task<bool> HasInternetAsync()
     {
-        try
-        {
-            using var client = new HttpClient();
-            client.Timeout = TimeSpan.FromSeconds(5);
-            // lightweight HEAD attempt
-            var req = new HttpRequestMessage(HttpMethod.Head, "https://www.python.org/");
-            var resp = await client.SendAsync(req);
-            return resp.IsSuccessStatusCode;
-        }
-        catch { return false; }
+        // Offline mode - always return false to skip internet check
+        return false;
     }
 
     async void OnSummarize(object? sender, TappedEventArgs e)
@@ -638,178 +630,117 @@ public partial class AddFlashcardsPage : ContentPage
             if (DeviceInfo.Platform != DevicePlatform.WinUI)
             { 
                 _navigatingForward = true;
-                _cardsAdded = true; // User is going to AI summarize (will add cards)
+                _cardsAdded = true;
                 await Shell.Current.GoToAsync($"///SummarizeContentPage?id={ReviewerId}&title={Uri.EscapeDataString(ReviewerTitle)}"); 
                 return; 
             }
             
-            // Show loading spinner during environment check
-            ShowLoadingSpinner(true, "Checking AI environment...", "Verifying Python and dependencies...");
-            
-            // ALWAYS revalidate environment (ignore _aiEnvReady cache) to detect uninstalled Python
             var bootstrapper = ServiceHelper.GetRequiredService<PythonBootstrapper>();
             
-            // New: fast system detection first
-            if (await bootstrapper.QuickSystemPythonHasLlamaAsync())
+            // Quick check if Python already exists
+            if (bootstrapper.TryGetExistingPython(out var existingPath))
             {
-                ShowLoadingSpinner(false);
-                _aiEnvReady = true; 
-                Preferences.Set("ai_env_ready", true);
+                // Python found - go directly to SummarizeContentPage
                 _navigatingForward = true;
-                _cardsAdded = true; // User is going to AI summarize (will add cards)
-                await Shell.Current.GoToAsync($"///SummarizeContentPage?id={ReviewerId}&title={Uri.EscapeDataString(ReviewerTitle)}");
-                return;
-            }
-            if (await bootstrapper.IsEnvironmentHealthyAsync())
-            {
-                ShowLoadingSpinner(false);
-                _aiEnvReady = true; 
-                Preferences.Set("ai_env_ready", true);
-                _navigatingForward = true;
-                _cardsAdded = true; // User is going to AI summarize (will add cards)
+                _cardsAdded = true;
                 await Shell.Current.GoToAsync($"///SummarizeContentPage?id={ReviewerId}&title={Uri.EscapeDataString(ReviewerTitle)}");
                 return;
             }
             
-            // Hide loading spinner before showing consent dialog
-            ShowLoadingSpinner(false);
+            // Python not found - check if python311.zip exists
+            var zipPath = Path.Combine(AppContext.BaseDirectory, "python311.zip");
+            if (!File.Exists(zipPath))
+            {
+                // ZIP file not found - show error
+                await this.ShowPopupAsync(new mindvault.Controls.InfoModal(
+                    "Setup Error",
+                    "Python runtime not found. Please extract 'python311.zip' to the application folder and restart.",
+                    "OK"
+                ));
+                return;
+            }
             
-            // Environment NOT healthy - clear cache and trigger install
-            _aiEnvReady = false;
-            Preferences.Set("ai_env_ready", false);
-            
-            AiSetupStatusLabel.Text = "Asking for installation consent...";
-            
-            // Combined modal: Install consent with automatic installation info
-            var consentResult = await this.ShowPopupAsync(new mindvault.Controls.InfoModal(
-                "Local AI Setup",
-                "Python or llama-cpp-python not detected. Install now?\n\n" +
-                "(~50-150MB download)\n\n" +
-                "The installation will run automatically in the background.\n\n" +
-                "This is a one-time setup and may take 1-3 minutes.\n\n" +
-                "Python and AI components will be configured automatically.",
-                "Install",
-                "Cancel"
+            // Python not installed but ZIP exists - ask permission
+            var consent = await this.ShowPopupAsync(new mindvault.Controls.AppModal(
+                "AI Setup",
+                "Python 3.11 is not found on your PC.\n\nWould you like to install it for offline AI features?",
+                "Yes", "No"
             ));
             
-            var consent = consentResult is bool b && b;
-            
-            AiSetupStatusLabel.Text = $"User response: {(consent ? "Install" : "Cancel")}";
-            
-            
-            if (!consent) 
+            if (consent is not bool || !(bool)consent)
             {
-                AiSetupStatusLabel.Text = "Installation cancelled by user.";
-                return;
+                return; // User declined
             }
             
-            // Show overlay immediately after consent
-            ShowInstallationOverlay(true, "Checking internet connection...", "Please wait...");
-            
-            AiSetupStatusLabel.Text = "User confirmed. Checking internet...";
-            
-            // Internet check
-            var online = await HasInternetAsync();
-            if (!online)
-            {
-                ShowInstallationOverlay(false);
-                var msg = "MindVault needs an internet connection to download Python and required dependencies. This is a one-time setup. Please connect to the internet and try again.";
-                AiSetupStatusLabel.Text = "?? " + msg;
-                try { System.IO.File.AppendAllText(bootstrapper.LogPath, msg + "\n"); } catch { }
-                return;
-            }
-            
-            ShowInstallationOverlay(true, "Installing Python...", "Downloading installer, please wait...");
-            AiSetupStatusLabel.Text = "Preparing environment...";
+            // User agreed - start setup
+            ShowInstallationOverlay(true, "Installing Python 3.11...", "This will only take a moment...");
             
             var progress = new Progress<string>(msg => 
             { 
                 MainThread.BeginInvokeOnMainThread(() =>
                 {
-                    AiSetupStatusLabel.Text = msg;
                     UpdateInstallationOverlay(msg);
                 });
             });
             
-            // Ensure Python is installed first
-            ((IProgress<string>)progress).Report("Installing Python...");
-            await bootstrapper.EnsurePythonReadyAsync(progress, CancellationToken.None);
-            
-            // Check if llama was already installed during EnsurePythonReadyAsync
-            bool llamaAlreadyInstalled = await bootstrapper.IsLlamaAvailableAsync();
-            
-            if (!llamaAlreadyInstalled)
+            try
             {
-                // Build llama in visible CMD window - spinner stays visible
-                ShowInstallationOverlay(true, "Building llama-cpp-python...", "A CMD window will open. Please wait for it to close automatically.");
-                AiSetupStatusLabel.Text = "Building llama-cpp-python in CMD...";
+                // Extract Python and prepare environment
+                await bootstrapper.EnsurePythonReadyAsync(progress, CancellationToken.None);
                 
-                await bootstrapper.BuildLlamaInCmdAsync(progress, CancellationToken.None);
+                // Verify Python was extracted successfully
+                if (bootstrapper.TryGetExistingPython(out var installedPath))
+                {
+                    // Success - write setup flag and navigate
+                    bootstrapper.WriteSetupFlag();
+                    _aiEnvReady = true;
+                    Preferences.Set("ai_env_ready", true);
+                    
+                    ShowInstallationOverlay(false);
+                    
+                    // Navigate directly to SummarizeContentPage
+                    _navigatingForward = true;
+                    _cardsAdded = true;
+                    await Shell.Current.GoToAsync($"///SummarizeContentPage?id={ReviewerId}&title={Uri.EscapeDataString(ReviewerTitle)}");
+                }
+                else
+                {
+                    // Python still not found after extraction
+                    ShowInstallationOverlay(false);
+                    await this.ShowPopupAsync(new mindvault.Controls.InfoModal(
+                        "Setup Error",
+                        "Python installation failed. The application will now close.\n\nPlease restart and try again.",
+                        "OK"
+                    ));
+                }
             }
-            
-            // Verify installation succeeded (including llama)
-            ShowInstallationOverlay(true, "Verifying installation...", "Almost done...");
-            AiSetupStatusLabel.Text = "Verifying llama-cpp-python...";
-            
-            if (await bootstrapper.IsEnvironmentHealthyAsync())
+            catch (Exception ex)
             {
-                _aiEnvReady = true;
-                Preferences.Set("ai_env_ready", true);
-                AiSetupStatusLabel.Text = "? Environment ready (Python + llama-cpp-python).";
-                ShowInstallationOverlay(false);
-            }
-            else
-            {
-                _aiEnvReady = false;
-                Preferences.Set("ai_env_ready", false);
                 ShowInstallationOverlay(false);
                 
-                // Show user-friendly error modal
+                string userMessage;
+                if (ex.Message.Contains("python311.zip"))
+                {
+                    userMessage = "Python 3.11 installation file not found.\n\nPlease ensure 'python311.zip' is in the application folder.";
+                }
+                else
+                {
+                    userMessage = $"Installation failed: {ex.Message}\n\nPlease restart the application and try again.";
+                }
+                
                 await this.ShowPopupAsync(new mindvault.Controls.InfoModal(
-                    "Setup Incomplete",
-                    "Python was installed but llama-cpp-python failed to build. This may require Visual Studio Build Tools. Please restart and try again.",
+                    "Setup Error",
+                    userMessage,
                     "OK"
                 ));
-                
-                AiSetupStatusLabel.Text = "?? Setup incomplete - llama build failed";
-                return;
             }
-            
-            _navigatingForward = true;
-            _cardsAdded = true; // User is going to AI summarize (will add cards)
-            await Shell.Current.GoToAsync($"///SummarizeContentPage?id={ReviewerId}&title={Uri.EscapeDataString(ReviewerTitle)}");
         }
         catch (Exception ex)
         {
             ShowInstallationOverlay(false);
-            _aiEnvReady = false;
-            Preferences.Set("ai_env_ready", false);
-            
-            // Create user-friendly error message
-            string userMessage;
-            if (ex.Message.Contains("Python") || ex.Message.Contains("python"))
-            {
-                userMessage = "Python installation failed. Please install Python 3.11 manually from python.org and ensure 'Add to PATH' is checked.";
-            }
-            else if (ex.Message.Contains("llama") || ex.Message.Contains("pip"))
-            {
-                userMessage = "Failed to install AI dependencies. Please check your internet connection and try again.";
-            }
-            else if (ex.Message.Contains("internet") || ex.Message.Contains("network") || ex.Message.Contains("connection"))
-            {
-                userMessage = "Network error. Please check your internet connection and try again.";
-            }
-            else
-            {
-                userMessage = "Setup failed. Please try again or install Python 3.11 manually from python.org.";
-            }
-            
-            AiSetupStatusLabel.Text = "?? Setup failed";
-            
-            // Show user-friendly error modal
             await this.ShowPopupAsync(new mindvault.Controls.InfoModal(
-                "Setup Error",
-                userMessage,
+                "Error",
+                $"Setup failed: {ex.Message}",
                 "OK"
             ));
         }

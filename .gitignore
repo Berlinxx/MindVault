@@ -1,3 +1,14 @@
+## ============================================
+## CRITICAL: Python Distribution Archive
+## ============================================
+## Prevent python311.zip (50-150MB) from being committed
+python311.zip
+Python311.zip
+**/python311.zip
+**/Python311.zip
+python*.zip
+Python*.zip
+
 ## .NET / Visual Studio
 .vs/
 *.user
