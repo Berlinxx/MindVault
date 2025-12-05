@@ -1,15 +1,18 @@
 using System;
 using System.Collections.Generic;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace mindvault.Services;
 
 /// <summary>
 /// Tracks failed password attempts and enforces cooldown periods to prevent brute-force attacks.
 /// Uses exponential backoff: 30s after 3 attempts, 60s after 5, 5min after 8.
+/// Identifies files by content hash to prevent bypass via renaming.
 /// </summary>
 public class PasswordAttemptService
 {
-    // Track attempts per file (using file name/hash as key)
+    // Track attempts per file (using content hash as key)
     private readonly Dictionary<string, AttemptInfo> _attempts = new();
     
     // Lockout configuration
@@ -26,6 +29,26 @@ public class PasswordAttemptService
         public int FailedAttempts { get; set; }
         public DateTime? LockoutUntil { get; set; }
         public DateTime LastAttempt { get; set; }
+    }
+    
+    /// <summary>
+    /// Generates a unique identifier for a file based on its content.
+    /// This prevents bypass via renaming the file.
+    /// </summary>
+    /// <param name="fileContent">The content of the file</param>
+    /// <returns>A hash string that uniquely identifies this file's content</returns>
+    public static string GenerateFileIdentifier(string fileContent)
+    {
+        if (string.IsNullOrEmpty(fileContent))
+            return "empty_file";
+        
+        // Use SHA256 hash of the content - even if user renames file, hash stays the same
+        using var sha256 = SHA256.Create();
+        var bytes = Encoding.UTF8.GetBytes(fileContent);
+        var hashBytes = sha256.ComputeHash(bytes);
+        
+        // Return first 16 chars of hex string (64 bits of entropy - plenty for this use case)
+        return Convert.ToHexString(hashBytes)[..16];
     }
     
     /// <summary>

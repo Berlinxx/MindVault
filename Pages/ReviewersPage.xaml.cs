@@ -450,7 +450,8 @@ public partial class ReviewersPage : ContentPage
             {
                 bool passwordCorrect = false;
                 var passwordAttemptService = ServiceHelper.GetRequiredService<PasswordAttemptService>();
-                var fileIdentifier = pick.FileName ?? "unknown_file";
+                // Use content hash as identifier - prevents bypass via file renaming
+                var fileIdentifier = PasswordAttemptService.GenerateFileIdentifier(content);
                 
                 while (!passwordCorrect)
                 {

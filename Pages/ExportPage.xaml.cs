@@ -71,14 +71,76 @@ public partial class ExportPage : ContentPage
 
             if (wantsPassword)
             {
-                // Get password from user using custom modal
-                var passwordModal = new Controls.PasswordInputModal(
-                    "Set Password",
-                    "Enter a password to encrypt your export file:",
-                    "Password");
+                bool passwordValid = false;
+                string? pwd = null;
                 
-                var pwdResult = await this.ShowPopupAsync(passwordModal);
-                var pwd = pwdResult as string;
+                while (!passwordValid)
+                {
+                    // Get password from user using custom modal with requirements hint
+                    var passwordModal = new Controls.PasswordInputModal(
+                        "Set Password",
+                        $"Enter a password to encrypt your export file:\n\n{PasswordValidationService.GetShortHint()}",
+                        "Password");
+                    
+                    var pwdResult = await this.ShowPopupAsync(passwordModal);
+                    pwd = pwdResult as string;
+                    
+                    if (string.IsNullOrWhiteSpace(pwd))
+                    {
+                        // User cancelled password entry
+                        return;
+                    }
+                    
+                    // Validate password strength
+                    var validation = PasswordValidationService.Validate(pwd);
+                    
+                    if (!validation.IsValid)
+                    {
+                        // Show validation errors and suggestions
+                        var errorMsg = string.Join("\n", validation.Errors);
+                        var suggestions = validation.Suggestions.Count > 0 
+                            ? "\n\nSuggestions:\n• " + string.Join("\n• ", validation.Suggestions)
+                            : "";
+                        
+                        var retry = await this.ShowPopupAsync(new Controls.InfoModal(
+                            $"Password {validation.StrengthText}",
+                            $"{errorMsg}{suggestions}",
+                            "Try Again",
+                            "Cancel"));
+                        
+                        if (retry is not bool retryBool || !retryBool)
+                        {
+                            return; // User cancelled
+                        }
+                        // Loop continues to ask for password again
+                    }
+                    else
+                    {
+                        // Password is valid - show strength feedback if not very strong
+                        if (validation.Strength < PasswordValidationService.PasswordStrength.Strong && validation.Suggestions.Count > 0)
+                        {
+                            var strengthMsg = $"Your password strength: {validation.StrengthText}\n\nTo make it stronger:\n• " + 
+                                             string.Join("\n• ", validation.Suggestions) +
+                                             "\n\nUse this password anyway?";
+                            
+                            // InfoModal: primary (1st param) goes to RIGHT, secondary (2nd param) goes to LEFT
+                            // We want "Use It" on RIGHT (red) and "Change" on LEFT (blue)
+                            var useAnyway = await this.ShowPopupAsync(new Controls.InfoModal(
+                                "Password Strength",
+                                strengthMsg,
+                                "Use It",      // Right button (primary action)
+                                "Change"));    // Left button (secondary/cancel)
+                            
+                            // Right button (Use It) returns true, Left button (Change) returns false
+                            if (useAnyway is not bool useAnywayBool || !useAnywayBool)
+                            {
+                                continue; // Let user try again
+                            }
+                        }
+                        
+                        passwordValid = true;
+                    }
+                }
                 
                 if (!string.IsNullOrWhiteSpace(pwd))
                 {

@@ -41,7 +41,7 @@
                     Margin="0,0,0,16" />
 
                 <!-- Buttons Row -->
-                <Grid Grid.Row="2" ColumnDefinitions="*,*" ColumnSpacing="12" HorizontalOptions="Center">
+                <HorizontalStackLayout Grid.Row="2" Spacing="12" HorizontalOptions="Center">
                     <!-- Single button (centered) -->
                     <Button
                         x:Name="LeftButton"
@@ -49,10 +49,10 @@
                         BackgroundColor="#0D6EFD"
                         TextColor="White"
                         CornerRadius="12"
-                        WidthRequest="120"
+                        MinimumWidthRequest="100"
+                        Padding="16,12"
                         HeightRequest="45"
                         Clicked="OnLeftClicked"
-                        Grid.ColumnSpan="2"
                         HorizontalOptions="Center"
                         IsVisible="{Binding IsSingleButton}" />
 
@@ -63,27 +63,27 @@
                         BackgroundColor="#0D6EFD"
                         TextColor="White"
                         CornerRadius="12"
-                        WidthRequest="120"
+                        MinimumWidthRequest="100"
+                        Padding="16,12"
                         HeightRequest="45"
                         Clicked="OnLeftClicked"
-                        Grid.Column="0"
                         HorizontalOptions="Center"
                         IsVisible="{Binding IsTwoButtons}" />
 
-                    <!-- Two-button layout: right button (Action - Blue) -->
+                    <!-- Two-button layout: right button (Action - Red for destructive) -->
                     <Button
                         x:Name="RightButtonTwo"
                         Text="{Binding RightButtonText}"
-                        BackgroundColor="#0D6EFD"
+                        BackgroundColor="#E74C3C"
                         TextColor="White"
                         CornerRadius="12"
-                        WidthRequest="120"
+                        MinimumWidthRequest="100"
+                        Padding="16,12"
                         HeightRequest="45"
                         Clicked="OnRightClicked"
-                        Grid.Column="1"
                         HorizontalOptions="Center"
                         IsVisible="{Binding IsTwoButtons}" />
-                </Grid>
+                </HorizontalStackLayout>
             </Grid>
         </Border>
 </toolkit:Popup>

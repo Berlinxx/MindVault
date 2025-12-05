@@ -50,16 +50,21 @@ namespace mindvault.Controls
             
             if (!IsSingleButton)
             {
-                // Check if secondary button is "Cancel" for red color, otherwise blue
+                // Left button (secondary) - typically blue, red only for "Cancel"
                 bool isCancel = secondaryText?.Equals("Cancel", StringComparison.OrdinalIgnoreCase) == true;
                 LeftButtonTwo.BackgroundColor = isCancel 
                     ? Color.FromArgb("#DC3545")  // Red for Cancel
                     : Color.FromArgb("#0D6EFD"); // Blue for other secondary actions
                 
-                // Check if primary button contains "Password" for red color
-                bool isPasswordAction = primaryText?.Contains("Password", StringComparison.OrdinalIgnoreCase) == true;
-                RightButtonTwo.BackgroundColor = isPasswordAction
-                    ? Color.FromArgb("#DC3545")  // Red for "Add Password"
+                // Right button (primary) - red for destructive/confirm actions, blue for others
+                bool isDestructiveOrConfirm = 
+                    primaryText?.Contains("Use", StringComparison.OrdinalIgnoreCase) == true ||
+                    primaryText?.Contains("Delete", StringComparison.OrdinalIgnoreCase) == true ||
+                    primaryText?.Contains("Reset", StringComparison.OrdinalIgnoreCase) == true ||
+                    primaryText?.Contains("Remove", StringComparison.OrdinalIgnoreCase) == true;
+                    
+                RightButtonTwo.BackgroundColor = isDestructiveOrConfirm
+                    ? Color.FromArgb("#E74C3C")  // Red for destructive/confirm actions
                     : Color.FromArgb("#0D6EFD"); // Blue for other actions
             }
 
