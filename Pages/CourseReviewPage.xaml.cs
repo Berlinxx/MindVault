@@ -32,6 +32,7 @@ namespace mindvault.Pages
         DateTime _lastSaveTime = DateTime.UtcNow;
         const string PrefRoundSize = "RoundSize";
         const string PrefStudyMode = "StudyMode"; // match ReviewerSettingsPage
+        const string PrefAutoTts = "AutoTts"; // match ReviewerSettingsPage
 
         public new string Title { get; }
         public int ReviewerId { get; private set; }
@@ -41,6 +42,9 @@ namespace mindvault.Pages
         public string ElapsedText => $"Time: {(int)(DateTime.UtcNow - _sessionStart).TotalMinutes} min";
         public bool AnswerButtonsEnabled => !_front;
         public bool SessionComplete { get; private set; }
+        
+        // Auto TTS setting
+        private bool _autoTtsEnabled;
 
         // === Concurrency control for mode changes/resets ===
         private readonly SemaphoreSlim _reloadGate = new(1, 1);
@@ -76,8 +80,17 @@ namespace mindvault.Pages
                 if (m.Value != ReviewerId) return;
                 // Just re-fetch current round size from preferences and update progress bar; do NOT reload engine
                 _roundSize = Preferences.Get($"RoundSize_{ReviewerId}", Preferences.Get("RoundSize", 10));
+                // Also refresh Auto-TTS setting
+                _autoTtsEnabled = Preferences.Get($"AutoTts_{ReviewerId}", Preferences.Get("AutoTts", false));
                 UpdateProgressBar();
                 OnPropertyChanged(nameof(ProgressWidth));
+            });
+            // Listen for Auto-TTS toggle changes
+            WeakReferenceMessenger.Default.Register<AutoTtsChangedMessage>(this, (r, m) =>
+            {
+                var (id, enabled) = m.Value;
+                if (id != ReviewerId) return;
+                _autoTtsEnabled = enabled;
             });
         }
 
@@ -113,6 +126,7 @@ namespace mindvault.Pages
             WeakReferenceMessenger.Default.UnregisterAll(this);
             WireMessages();
             _roundSize = Preferences.Get($"{PrefRoundSize}_{ReviewerId}", Preferences.Get(PrefRoundSize, 10));
+            _autoTtsEnabled = Preferences.Get($"{PrefAutoTts}_{ReviewerId}", Preferences.Get(PrefAutoTts, false));
             
 #if WINDOWS
             // Delay to ensure Window is initialized
@@ -233,6 +247,12 @@ namespace mindvault.Pages
             _front = !_front;
             RandomizeFaceFontSize();
             UpdateBindingsAll();
+            
+            // Auto TTS: speak the card text after flip
+            if (_autoTtsEnabled)
+            {
+                await TriggerAutoTtsAsync();
+            }
         }
 
         private async Task FlipAnimationAsync()
@@ -278,6 +298,12 @@ namespace mindvault.Pages
                 _engine.SaveProgress();
                 _lastSaveTime = DateTime.UtcNow;
             }
+            
+            // Auto TTS: speak the new card text
+            if (_autoTtsEnabled && !roundFinished)
+            {
+                await TriggerAutoTtsAsync();
+            }
         }
 
         private async void OnFail(object? s, TappedEventArgs e)
@@ -300,6 +326,12 @@ namespace mindvault.Pages
                 _engine.SaveProgress();
                 _lastSaveTime = DateTime.UtcNow;
             }
+            
+            // Auto TTS: speak the new card text
+            if (_autoTtsEnabled && !roundFinished)
+            {
+                await TriggerAutoTtsAsync();
+            }
         }
 
         private async void OnSkip(object? s, TappedEventArgs e)
@@ -307,6 +339,12 @@ namespace mindvault.Pages
             await _engine.SkipCardAsync();
             _front = true;
             UpdateBindingsAll();
+            
+            // Auto TTS: speak the new card text
+            if (_autoTtsEnabled)
+            {
+                await TriggerAutoTtsAsync();
+            }
         }
 
         private void OnBucketTapped(object? s, TappedEventArgs e)
@@ -377,6 +415,41 @@ namespace mindvault.Pages
         // === TTS ===
         private CancellationTokenSource? _ttsCts;
         private bool _isSpeaking;
+
+        /// <summary>
+        /// Triggers Auto-TTS to speak the current card text.
+        /// Called automatically on flip and new card when Auto-TTS is enabled.
+        /// </summary>
+        private async Task TriggerAutoTtsAsync()
+        {
+            try
+            {
+                // Cancel any ongoing speech first
+                if (_isSpeaking)
+                {
+                    _ttsCts?.Cancel();
+                    _ttsCts?.Dispose();
+                    _ttsCts = null;
+                    _isSpeaking = false;
+                    await Task.Delay(50); // Brief pause to ensure cancellation completes
+                }
+
+                var text = FaceText;
+                if (string.IsNullOrWhiteSpace(text)) return;
+
+                _ttsCts = new CancellationTokenSource();
+                _isSpeaking = true;
+                await TextToSpeech.Default.SpeakAsync(text, new SpeechOptions { Volume = 1.0f }, _ttsCts.Token);
+            }
+            catch (OperationCanceledException) { }
+            catch (Exception ex) { Debug.WriteLine($"[AutoTTS] {ex.Message}"); }
+            finally
+            {
+                _isSpeaking = false;
+                _ttsCts?.Dispose();
+                _ttsCts = null;
+            }
+        }
 
         private async void OnSpeakTapped(object? s, TappedEventArgs e)
         {
@@ -593,7 +666,7 @@ namespace mindvault.Pages
                     _windowContent.KeyDown -= _keyDownHandler;
                 }
 
-                _keyDownHandler = new Microsoft.UI.Xaml.Input.KeyEventHandler((sender, e) =>
+        _keyDownHandler = new Microsoft.UI.Xaml.Input.KeyEventHandler((sender, e) =>
                 {
                     var key = e.Key;
                     bool handled = false;
@@ -618,6 +691,18 @@ namespace mindvault.Pages
                     else if ((key == Windows.System.VirtualKey.Right || key == Windows.System.VirtualKey.D) && AnswerButtonsEnabled)
                     {
                         MainThread.BeginInvokeOnMainThread(() => OnPass(null, null!));
+                        handled = true;
+                    }
+                    // Text-to-Speech: Q
+                    else if (key == Windows.System.VirtualKey.Q)
+                    {
+                        MainThread.BeginInvokeOnMainThread(() => OnSpeakTapped(null, null!));
+                        handled = true;
+                    }
+                    // Skip: E, Tab
+                    else if (key == Windows.System.VirtualKey.E || key == Windows.System.VirtualKey.Tab)
+                    {
+                        MainThread.BeginInvokeOnMainThread(() => OnSkip(null, null!));
                         handled = true;
                     }
 

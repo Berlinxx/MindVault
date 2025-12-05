@@ -33,10 +33,12 @@ public partial class ReviewerSettingsPage : ContentPage, INotifyPropertyChanged
 
     const string PrefRoundSize = "RoundSize"; // base key
     const string PrefStudyMode = "StudyMode"; // base key
+    const string PrefAutoTts = "AutoTts"; // base key for auto text-to-speech
     const string PrefReviewStatePrefix = "ReviewState_"; // matches CourseReviewPage
 
     int _roundSize;
     string _mode = "Default";
+    bool _autoTts;
 
     public ReviewerSettingsPage() : this("Math Reviewer") { }
 
@@ -64,9 +66,11 @@ public partial class ReviewerSettingsPage : ContentPage, INotifyPropertyChanged
         // Load per-deck settings
         _roundSize = Preferences.Get(DeckKey(PrefRoundSize, ReviewerId), Preferences.Get(PrefRoundSize, 10));
         _mode = Preferences.Get(DeckKey(PrefStudyMode, ReviewerId), Preferences.Get(PrefStudyMode, "Default"));
+        _autoTts = Preferences.Get(DeckKey(PrefAutoTts, ReviewerId), Preferences.Get(PrefAutoTts, false));
         BindingContext = this; // ensure latest props are bound
         UpdateChipUI();
         UpdateModeUI(_mode);
+        UpdateAutoTtsUI();
     }
 
     static string DeckKey(string key, int id) => id > 0 ? $"{key}_{id}" : key;
@@ -116,6 +120,23 @@ public partial class ReviewerSettingsPage : ContentPage, INotifyPropertyChanged
             var examLabel = this.FindByName<Label>("ExamTileLabel");
             if (examLabel != null) examLabel.TextColor = Colors.Black;
         }
+    }
+
+    void UpdateAutoTtsUI()
+    {
+        var autoTtsSwitch = this.FindByName<Microsoft.Maui.Controls.Switch>("AutoTtsSwitch");
+        if (autoTtsSwitch != null)
+        {
+            autoTtsSwitch.IsToggled = _autoTts;
+        }
+    }
+
+    private void OnAutoTtsToggled(object? sender, ToggledEventArgs e)
+    {
+        _autoTts = e.Value;
+        Preferences.Set(DeckKey(PrefAutoTts, ReviewerId), _autoTts);
+        // Send message to notify CourseReviewPage of the change
+        WeakReferenceMessenger.Default.Send(new AutoTtsChangedMessage(ReviewerId, _autoTts));
     }
 
     private void OnDefaultModeTapped(object? sender, TappedEventArgs e)

@@ -21,3 +21,8 @@ public sealed class SettingsClosedMessage : ValueChangedMessage<int>
 {
     public SettingsClosedMessage(int reviewerId) : base(reviewerId) { }
 }
+
+public sealed class AutoTtsChangedMessage : ValueChangedMessage<(int ReviewerId, bool Enabled)>
+{
+    public AutoTtsChangedMessage(int reviewerId, bool enabled) : base((reviewerId, enabled)) { }
+}

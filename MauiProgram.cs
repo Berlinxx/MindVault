@@ -140,6 +140,7 @@ public static class MauiProgram
         builder.Services.AddSingleton<PythonFlashcardService>();
         builder.Services.AddSingleton<MultiplayerService>();
         builder.Services.AddSingleton<AppDataResetService>(); // Data reset utility
+        builder.Services.AddSingleton<PasswordAttemptService>(); // Password brute-force protection
 
 #if DEBUG
         builder.Logging.AddDebug();

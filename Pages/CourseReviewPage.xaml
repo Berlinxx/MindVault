@@ -203,7 +203,7 @@
             <Grid Grid.Row="2" ColumnDefinitions="*,Auto,Auto" Padding="0,10,0,0">
               <Border Grid.Column="1" BackgroundColor="#E6E6E6"
                       StrokeShape="RoundRectangle 14" Padding="16,6"
-                      ToolTipProperties.Text="Skip this card"
+                      ToolTipProperties.Text="Skip this card (E, Tab)"
                       SemanticProperties.Description="Skip button"
                       SemanticProperties.Hint="Moves to the next card without answering">
                 <HorizontalStackLayout Spacing="8">
@@ -217,7 +217,7 @@
 
               <Border x:Name="SpeakButton" Grid.Column="2" WidthRequest="34" HeightRequest="34"
                       Stroke="#E8EDF2" StrokeThickness="1" StrokeShape="Ellipse" BackgroundColor="White" Margin="10,0,0,0"
-                      ToolTipProperties.Text="Read text aloud"
+                      ToolTipProperties.Text="Read text aloud (Q)"
                       SemanticProperties.Description="Text to speech button"
                       SemanticProperties.Hint="Reads the current card text aloud">
                 <Label Text="&#xF028;" FontFamily="FontAwesome6FreeSolid" FontSize="14" TextColor="{StaticResource TextPrimary}"

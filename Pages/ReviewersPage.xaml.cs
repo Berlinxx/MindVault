@@ -449,13 +449,31 @@ public partial class ReviewersPage : ContentPage
             if (ExportEncryptionService.IsEncrypted(content))
             {
                 bool passwordCorrect = false;
+                var passwordAttemptService = ServiceHelper.GetRequiredService<PasswordAttemptService>();
+                var fileIdentifier = pick.FileName ?? "unknown_file";
                 
                 while (!passwordCorrect)
                 {
+                    // Check for lockout first
+                    var (isLockedOut, remainingSeconds) = passwordAttemptService.CheckLockout(fileIdentifier);
+                    if (isLockedOut)
+                    {
+                        var lockoutMsg = PasswordAttemptService.FormatLockoutMessage(remainingSeconds);
+                        await page.ShowPopupAsync(new AppModal(
+                            "Too Many Attempts",
+                            $"You have entered incorrect passwords too many times.\n\nPlease wait {lockoutMsg} before trying again.",
+                            "OK"));
+                        return;
+                    }
+                    
+                    // Show remaining attempts hint
+                    var remainingAttempts = passwordAttemptService.GetRemainingAttempts(fileIdentifier);
+                    var attemptHint = remainingAttempts < 3 ? $"\n\n⚠️ {remainingAttempts} attempt{(remainingAttempts > 1 ? "s" : "")} remaining before cooldown." : "";
+                    
                     // Ask for password using custom modal
                     var passwordModal = new PasswordInputModal(
                         "Password Required",
-                        "This file is password-protected. Enter the password:",
+                        $"This file is password-protected. Enter the password:{attemptHint}",
                         "Password");
                     
                     var passwordResult = await page.ShowPopupAsync(passwordModal);
@@ -472,13 +490,30 @@ public partial class ReviewersPage : ContentPage
                     {
                         content = ExportEncryptionService.Decrypt(content, password);
                         passwordCorrect = true;
+                        passwordAttemptService.RecordSuccessfulAttempt(fileIdentifier);
                         System.Diagnostics.Debug.WriteLine($"[ReviewersPage] Decryption successful");
                     }
                     catch (System.Security.Cryptography.CryptographicException)
                     {
+                        // Record the failed attempt
+                        var (isNowLockedOut, lockoutSeconds, totalAttempts) = passwordAttemptService.RecordFailedAttempt(fileIdentifier);
+                        
+                        if (isNowLockedOut)
+                        {
+                            var lockoutMsg = PasswordAttemptService.FormatLockoutMessage(lockoutSeconds);
+                            await page.ShowPopupAsync(new AppModal(
+                                "Too Many Attempts",
+                                $"You have entered {totalAttempts} incorrect passwords.\n\nPlease wait {lockoutMsg} before trying again.",
+                                "OK"));
+                            return;
+                        }
+                        
+                        remainingAttempts = passwordAttemptService.GetRemainingAttempts(fileIdentifier);
+                        var retryHint = remainingAttempts > 0 ? $"\n\n{remainingAttempts} attempt{(remainingAttempts > 1 ? "s" : "")} remaining." : "";
+                        
                         var retry = await page.ShowPopupAsync(new InfoModal(
                             "Incorrect Password",
-                            "The password you entered is incorrect. Would you like to try again?",
+                            $"The password you entered is incorrect. Would you like to try again?{retryHint}",
                             "Try Again",
                             "Cancel"));
                         

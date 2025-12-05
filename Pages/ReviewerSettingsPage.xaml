@@ -155,6 +155,29 @@
 
             <BoxView HeightRequest="1" BackgroundColor="{StaticResource Divider}" Margin="0,6"/>
 
+            <!-- Auto Text-to-Speech Toggle -->
+            <Border BackgroundColor="{StaticResource Primary}" StrokeThickness="0"
+                    StrokeShape="RoundRectangle 12" Padding="12,8"
+                    SemanticProperties.Description="Auto text-to-speech section">
+              <Label Text="Auto Text-to-Speech" TextColor="White" FontAttributes="Bold" />
+            </Border>
+            
+            <Grid ColumnDefinitions="*,Auto" Padding="8,4">
+              <VerticalStackLayout Spacing="2">
+                <Label Text="Read aloud automatically" FontSize="14" TextColor="{StaticResource TextPrimary}" FontAttributes="Bold"/>
+                <Label Text="Speaks card text on every flip and new card" FontSize="12" TextColor="{StaticResource TextSecondary}"/>
+              </VerticalStackLayout>
+              <Switch x:Name="AutoTtsSwitch" Grid.Column="1" 
+                      Toggled="OnAutoTtsToggled"
+                      OnColor="{StaticResource Primary}"
+                      ThumbColor="White"
+                      ToolTipProperties.Text="Toggle automatic text-to-speech"
+                      SemanticProperties.Description="Auto TTS toggle switch"
+                      SemanticProperties.Hint="When enabled, card text is read aloud automatically on flip and new card"/>
+            </Grid>
+
+            <BoxView HeightRequest="1" BackgroundColor="{StaticResource Divider}" Margin="0,6"/>
+
             <!-- Questions per round -->
             <Border BackgroundColor="{StaticResource Primary}" StrokeThickness="0"
                     StrokeShape="RoundRectangle 12" Padding="12,8"

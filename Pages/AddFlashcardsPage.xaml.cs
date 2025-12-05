@@ -242,13 +242,33 @@ public partial class AddFlashcardsPage : ContentPage
             if (mindvault.Services.ExportEncryptionService.IsEncrypted(content))
             {
                 bool passwordCorrect = false;
+                var passwordAttemptService = ServiceHelper.GetRequiredService<PasswordAttemptService>();
+                var fileIdentifier = pick.FileName ?? "unknown_file";
                 
                 while (!passwordCorrect)
                 {
+                    // Check for lockout first
+                    var (isLockedOut, remainingSeconds) = passwordAttemptService.CheckLockout(fileIdentifier);
+                    if (isLockedOut)
+                    {
+                        var lockoutMsg = PasswordAttemptService.FormatLockoutMessage(remainingSeconds);
+                        await this.ShowPopupAsync(new mindvault.Controls.AppModal(
+                            "Too Many Attempts",
+                            $"You have entered incorrect passwords too many times.\n\nPlease wait {lockoutMsg} before trying again.",
+                            "OK"));
+                        
+                        if (ProcessingIndicator != null) { ProcessingIndicator.IsRunning = false; ProcessingIndicator.IsVisible = false; }
+                        return;
+                    }
+                    
+                    // Show remaining attempts hint
+                    var remainingAttempts = passwordAttemptService.GetRemainingAttempts(fileIdentifier);
+                    var attemptHint = remainingAttempts < 3 ? $"\n\n?? {remainingAttempts} attempt{(remainingAttempts > 1 ? "s" : "")} remaining before cooldown." : "";
+                    
                     // Ask for password using custom modal
                     var passwordModal = new mindvault.Controls.PasswordInputModal(
                         "Password Required",
-                        "This file is password-protected. Enter the password:",
+                        $"This file is password-protected. Enter the password:{attemptHint}",
                         "Password");
                     
                     var passwordResult = await this.ShowPopupAsync(passwordModal);
@@ -265,12 +285,31 @@ public partial class AddFlashcardsPage : ContentPage
                     {
                         content = mindvault.Services.ExportEncryptionService.Decrypt(content, password);
                         passwordCorrect = true;
+                        passwordAttemptService.RecordSuccessfulAttempt(fileIdentifier);
                     }
                     catch (System.Security.Cryptography.CryptographicException)
                     {
+                        // Record the failed attempt
+                        var (isNowLockedOut, lockoutSeconds, totalAttempts) = passwordAttemptService.RecordFailedAttempt(fileIdentifier);
+                        
+                        if (isNowLockedOut)
+                        {
+                            var lockoutMsg = PasswordAttemptService.FormatLockoutMessage(lockoutSeconds);
+                            await this.ShowPopupAsync(new mindvault.Controls.AppModal(
+                                "Too Many Attempts",
+                                $"You have entered {totalAttempts} incorrect passwords.\n\nPlease wait {lockoutMsg} before trying again.",
+                                "OK"));
+                            
+                            if (ProcessingIndicator != null) { ProcessingIndicator.IsRunning = false; ProcessingIndicator.IsVisible = false; }
+                            return;
+                        }
+                        
+                        remainingAttempts = passwordAttemptService.GetRemainingAttempts(fileIdentifier);
+                        var retryHint = remainingAttempts > 0 ? $"\n\n{remainingAttempts} attempt{(remainingAttempts > 1 ? "s" : "")} remaining." : "";
+                        
                         var retry = await this.ShowPopupAsync(new mindvault.Controls.InfoModal(
                             "Incorrect Password",
-                            "The password you entered is incorrect. Would you like to try again?",
+                            $"The password you entered is incorrect. Would you like to try again?{retryHint}",
                             "Try Again",
                             "Cancel"));
                         
