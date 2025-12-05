@@ -1,15 +1,18 @@
 using mindvault.Services;
 using mindvault.Utils;
+using mindvault.Controls;
 using System.Diagnostics;
 using mindvault.Data;
 using Microsoft.Maui.Controls;
+using CommunityToolkit.Maui.Views;
+using System.Threading;
 
 namespace mindvault.Pages;
 
 public partial class TitleReviewerPage : ContentPage
 {
     readonly DatabaseService _db;
-    bool _isCreating;
+    readonly SemaphoreSlim _createLock = new(1, 1);
 
     public TitleReviewerPage()
     {
@@ -29,16 +32,55 @@ public partial class TitleReviewerPage : ContentPage
         await CreateNewReviewerAsync();
     }
 
+    /// <summary>
+    /// Shows the AppModal popup and waits for it to be dismissed.
+    /// Uses TaskCompletionSource with proper event handling to ensure completion.
+    /// </summary>
+    private async Task ShowModalAlertAsync(string title, string message, string buttonText)
+    {
+        var tcs = new TaskCompletionSource<bool>();
+        var modal = new AppModal(title, message, buttonText);
+        
+        // Subscribe to Closed event BEFORE showing the popup
+        EventHandler<CommunityToolkit.Maui.Core.PopupClosedEventArgs>? closedHandler = null;
+        closedHandler = (s, e) =>
+        {
+            modal.Closed -= closedHandler;
+            tcs.TrySetResult(true);
+        };
+        modal.Closed += closedHandler;
+        
+        // Show the popup
+        this.ShowPopup(modal);
+        
+        // Wait for completion with timeout as safety net
+        var completedTask = await Task.WhenAny(tcs.Task, Task.Delay(30000));
+        if (completedTask != tcs.Task)
+        {
+            Debug.WriteLine("[TitleReviewerPage] Modal timeout - forcing completion");
+            tcs.TrySetResult(true);
+        }
+    }
+
     private async Task CreateNewReviewerAsync()
     {
-        if (_isCreating) return;
-        _isCreating = true;
+        // Use TryWait to immediately return if already processing (no queuing)
+        if (!await _createLock.WaitAsync(0))
+        {
+            Debug.WriteLine("[TitleReviewerPage] CreateNewReviewerAsync already in progress, ignoring");
+            return;
+        }
+        
+        Debug.WriteLine("[TitleReviewerPage] CreateNewReviewerAsync started");
+        
         try
         {
             var title = TitleEntry?.Text?.Trim();
             if (string.IsNullOrEmpty(title))
             {
-                await PageHelpers.SafeDisplayAlertAsync(this, "Oops", "Please enter a title for your reviewer.", "OK");
+                Debug.WriteLine("[TitleReviewerPage] Title is empty, showing modal");
+                await ShowModalAlertAsync("Oops", "Please enter a title for your reviewer.", "OK");
+                Debug.WriteLine("[TitleReviewerPage] Modal dismissed, returning");
                 return;
             }
 
@@ -53,15 +95,27 @@ public partial class TitleReviewerPage : ContentPage
                 async () => await Shell.Current.GoToAsync($"///AddFlashcardsPage?id={reviewer.Id}&title={Uri.EscapeDataString(reviewer.Title)}"),
                 "Could not open add flashcards page");
         }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[TitleReviewerPage] Error: {ex.Message}");
+            await ShowModalAlertAsync("Error", "Could not create reviewer. Please try again.", "OK");
+        }
         finally
         {
-            _isCreating = false;
+            _createLock.Release();
+            Debug.WriteLine("[TitleReviewerPage] CreateNewReviewerAsync finished, lock released");
         }
     }
 
     protected override void OnAppearing()
     {
         base.OnAppearing();
+        // Reset the semaphore when page appears in case it was left in a bad state
+        // Only release if it's currently held (CurrentCount == 0)
+        if (_createLock.CurrentCount == 0)
+        {
+            try { _createLock.Release(); } catch { }
+        }
         _ = RunEntryAnimationAsync();
     }
 

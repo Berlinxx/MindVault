@@ -186,7 +186,17 @@ public partial class ReviewerSettingsPage : ContentPage, INotifyPropertyChanged
             }
             if (reviewerId > 0)
             {
+                // Remove legacy Preferences storage
                 Preferences.Remove(PrefReviewStatePrefix + reviewerId);
+                
+                // Remove file-based progress storage
+                var progressFilePath = System.IO.Path.Combine(FileSystem.AppDataDirectory, "Progress", $"ReviewState_{reviewerId}.json");
+                if (System.IO.File.Exists(progressFilePath))
+                {
+                    System.IO.File.Delete(progressFilePath);
+                    Debug.WriteLine($"[ReviewerSettings] Deleted progress file: {progressFilePath}");
+                }
+                
                 WeakReferenceMessenger.Default.Send(new ProgressResetMessage(reviewerId));
                 this.ShowPopup(new AppModal("Progress Reset", "Your review progress has been cleared.", "OK"));
             }

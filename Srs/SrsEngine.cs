@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Text.Json;
 using System.Threading;
@@ -380,7 +382,13 @@ namespace mindvault.Srs
                     c.SeenCount,
                     c.Repetitions
                 }).ToList();
-                Preferences.Set(GetReviewStateKey(), JsonSerializer.Serialize(payload));
+                
+                var json = JsonSerializer.Serialize(payload);
+                
+                // Use file storage instead of Preferences to avoid Windows 8KB limit
+                var filePath = GetProgressFilePath();
+                File.WriteAllText(filePath, json);
+                Debug.WriteLine($"[SrsEngine] Progress saved to file: {filePath} ({json.Length} bytes)");
 
                 // Update database Learned field for cards that have reached Learned stage
                 if (_db != null && ReviewerId > 0)
@@ -398,14 +406,63 @@ namespace mindvault.Srs
                     });
                 }
             }
-            catch (Exception ex) { _logger.Warn("SaveProgress error: " + ex.Message, "srs"); }
+            catch (Exception ex) { _logger.Warn("SaveProgress error: " + ex.Message, "srs"); Debug.WriteLine($"[SrsEngine] SaveProgress error: {ex.Message}"); }
+        }
+
+        /// <summary>
+        /// Gets the file path for storing progress data for the current reviewer.
+        /// Uses AppDataDirectory which has no size limits.
+        /// </summary>
+        private string GetProgressFilePath()
+        {
+            var progressDir = Path.Combine(FileSystem.AppDataDirectory, "Progress");
+            if (!Directory.Exists(progressDir))
+            {
+                Directory.CreateDirectory(progressDir);
+            }
+            return Path.Combine(progressDir, $"ReviewState_{ReviewerId}.json");
         }
 
         private void RestoreProgress()
         {
             try
             {
-                var payload = Preferences.Get(GetReviewStateKey(), null);
+                string? payload = null;
+                var filePath = GetProgressFilePath();
+                
+                // First, try to read from file storage (new format)
+                if (File.Exists(filePath))
+                {
+                    payload = File.ReadAllText(filePath);
+                    Debug.WriteLine($"[SrsEngine] Progress loaded from file: {filePath}");
+                }
+                else
+                {
+                    // Fallback: try legacy Preferences storage and migrate if found
+                    payload = Preferences.Get(GetReviewStateKey(), null);
+                    if (!string.IsNullOrWhiteSpace(payload))
+                    {
+                        Debug.WriteLine($"[SrsEngine] Migrating progress from Preferences to file storage");
+                        // Migrate to file storage
+                        try
+                        {
+                            var progressDir = Path.Combine(FileSystem.AppDataDirectory, "Progress");
+                            if (!Directory.Exists(progressDir))
+                            {
+                                Directory.CreateDirectory(progressDir);
+                            }
+                            File.WriteAllText(filePath, payload);
+                            // Remove from Preferences after successful migration
+                            Preferences.Remove(GetReviewStateKey());
+                            Debug.WriteLine($"[SrsEngine] Migration complete, legacy preference removed");
+                        }
+                        catch (Exception migEx)
+                        {
+                            Debug.WriteLine($"[SrsEngine] Migration failed: {migEx.Message}");
+                        }
+                    }
+                }
+                
                 if (string.IsNullOrWhiteSpace(payload)) return;
                 var list = JsonSerializer.Deserialize<List<JsonElement>>(payload);
                 if (list == null) return;
@@ -427,8 +484,9 @@ namespace mindvault.Srs
                     card.Repetitions = dto.TryGetProperty("Repetitions", out var rep) ? rep.GetInt32() : 0;
                     if (card.Stage >= Stage.Learned) { _learnedEver.Add(card); if (card.Stage >= Stage.Skilled) card.CountedSkilled = true; if (card.Stage == Stage.Memorized) card.CountedMemorized = true; }
                 }
+                Debug.WriteLine($"[SrsEngine] Restored progress for {list.Count} cards");
             }
-            catch (Exception ex) { _logger.Warn("RestoreProgress error: " + ex.Message, "srs"); }
+            catch (Exception ex) { _logger.Warn("RestoreProgress error: " + ex.Message, "srs"); Debug.WriteLine($"[SrsEngine] RestoreProgress error: {ex.Message}"); }
         }
 
         public SrsEngine(ICoreLogger logger, DatabaseService? db = null)

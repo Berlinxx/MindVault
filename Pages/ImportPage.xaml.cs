@@ -334,13 +334,18 @@ public partial class ImportPage : ContentPage
                 Debug.WriteLine($"[ImportPage] Mapped progress: Old ID -> New ID {newCard.Id}, Stage: {progressEntry.Stage}");
             }
             
-            // Serialize and save the remapped progress
+            // Serialize and save the remapped progress to file storage (avoids Windows 8KB Preferences limit)
             var newProgressJson = System.Text.Json.JsonSerializer.Serialize(newProgress);
-            var progressKey = $"ReviewState_{reviewerId}";
-            Preferences.Set(progressKey, newProgressJson);
+            var progressDir = Path.Combine(FileSystem.AppDataDirectory, "Progress");
+            if (!Directory.Exists(progressDir))
+            {
+                Directory.CreateDirectory(progressDir);
+            }
+            var progressFilePath = Path.Combine(progressDir, $"ReviewState_{reviewerId}.json");
+            File.WriteAllText(progressFilePath, newProgressJson);
             
             Debug.WriteLine($"[ImportPage] ✓ Successfully imported and remapped progress data for {newProgress.Count} cards (reviewer {reviewerId})");
-            Debug.WriteLine($"[ImportPage] Progress key: {progressKey}");
+            Debug.WriteLine($"[ImportPage] Progress file: {progressFilePath}");
             
             return true;
         }

@@ -617,9 +617,27 @@ public partial class ReviewersPage : ContentPage
             if (cards == null || cards.Count == 0)
                 return (0, 0, 0);
 
-            // Load saved SRS progress from Preferences
-            var progressKey = $"ReviewState_{reviewerId}";
-            var payload = Preferences.Get(progressKey, null);
+            // Try to load from file storage first (new format)
+            string? payload = null;
+            var progressDir = Path.Combine(FileSystem.AppDataDirectory, "Progress");
+            var filePath = Path.Combine(progressDir, $"ReviewState_{reviewerId}.json");
+            
+            if (File.Exists(filePath))
+            {
+                payload = File.ReadAllText(filePath);
+                Debug.WriteLine($"[ReviewersPage] Loaded progress from file for reviewer {reviewerId}");
+            }
+            else
+            {
+                // Fallback: try legacy Preferences storage
+                var progressKey = $"ReviewState_{reviewerId}";
+                payload = Preferences.Get(progressKey, null);
+                
+                if (!string.IsNullOrWhiteSpace(payload))
+                {
+                    Debug.WriteLine($"[ReviewersPage] Loaded progress from legacy Preferences for reviewer {reviewerId}");
+                }
+            }
             
             if (string.IsNullOrWhiteSpace(payload))
             {
@@ -660,8 +678,9 @@ public partial class ReviewersPage : ContentPage
 
             return (learnedCount, skilledCount, memorizedCount);
         }
-        catch
+        catch (Exception ex)
         {
+            Debug.WriteLine($"[ReviewersPage] LoadSrsMasteryCounts error: {ex.Message}");
             return (0, 0, 0);
         }
     }
@@ -678,9 +697,21 @@ public partial class ReviewersPage : ContentPage
 
             var now = DateTime.UtcNow;
 
-            // Load saved SRS progress from Preferences
-            var progressKey = $"ReviewState_{reviewerId}";
-            var payload = Preferences.Get(progressKey, null);
+            // Try to load from file storage first (new format)
+            string? payload = null;
+            var progressDir = Path.Combine(FileSystem.AppDataDirectory, "Progress");
+            var filePath = Path.Combine(progressDir, $"ReviewState_{reviewerId}.json");
+            
+            if (File.Exists(filePath))
+            {
+                payload = File.ReadAllText(filePath);
+            }
+            else
+            {
+                // Fallback: try legacy Preferences storage
+                var progressKey = $"ReviewState_{reviewerId}";
+                payload = Preferences.Get(progressKey, null);
+            }
             
             if (string.IsNullOrWhiteSpace(payload))
             {
@@ -730,8 +761,9 @@ public partial class ReviewersPage : ContentPage
 
             return dueCount;
         }
-        catch
+        catch (Exception ex)
         {
+            Debug.WriteLine($"[ReviewersPage] CalculateDueCount error: {ex.Message}");
             return 0;
         }
     }
