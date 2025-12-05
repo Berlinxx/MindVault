@@ -7,50 +7,89 @@ namespace mindvault.Pages;
 
 public partial class DeveloperToolsPage : ContentPage
 {
-    private readonly AppDataResetService _resetService;
+    private AppDataResetService? _resetService;
     private string _databasePath = string.Empty;
 
     public DeveloperToolsPage()
     {
-        InitializeComponent();
-        _resetService = ServiceHelper.GetRequiredService<AppDataResetService>();
-        LoadDatabaseInfo();
-        RefreshUsageInfo();
-        
-        // Initialize the Developer Mode switch state
-        DeveloperModeSwitch.IsToggled = ProfileState.DeveloperToolsEnabled;
+        try
+        {
+            InitializeComponent();
+            
+            // Try to get the reset service - it might not be registered
+            try
+            {
+                _resetService = ServiceHelper.GetRequiredService<AppDataResetService>();
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[DeveloperTools] Failed to get AppDataResetService: {ex.Message}");
+                _resetService = null;
+            }
+            
+            LoadDatabaseInfo();
+            RefreshUsageInfo();
+            
+            // Initialize the Developer Mode switch state
+            if (DeveloperModeSwitch != null)
+            {
+                DeveloperModeSwitch.IsToggled = ProfileState.DeveloperToolsEnabled;
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[DeveloperTools] Constructor error: {ex}");
+            // Show error in UI instead of crashing
+            MainThread.BeginInvokeOnMainThread(async () =>
+            {
+                try
+                {
+                    await DisplayAlert("Error", $"Failed to load Developer Tools: {ex.Message}", "OK");
+                    await Navigation.PopAsync();
+                }
+                catch { }
+            });
+        }
     }
     
     private async void OnDeveloperModeToggled(object? sender, ToggledEventArgs e)
     {
-        if (!e.Value)
+        try
         {
-            // User is trying to disable Developer Tools
-            var confirm = await this.ShowPopupAsync(
-                new AppModal(
-                    "Disable Developer Tools",
-                    "This will hide Developer Tools from the menu.\n\nTo re-enable, go to Settings and tap the avatar 8 times.",
-                    "Disable",
-                    "Cancel"));
-
-            if (confirm is bool b && b)
+            if (!e.Value)
             {
-                ProfileState.DeveloperToolsEnabled = false;
-                ShowStatus("Developer Tools disabled. Tap avatar 8x in Settings to re-enable.");
-                Debug.WriteLine("[DeveloperTools] Developer Tools DISABLED");
+                // User is trying to disable Developer Tools
+                var confirm = await this.ShowPopupAsync(
+                    new AppModal(
+                        "Disable Developer Tools",
+                        "This will hide Developer Tools from the menu.\n\nTo re-enable, go to Settings and tap the avatar 8 times.",
+                        "Disable",
+                        "Cancel"));
+
+                if (confirm is bool b && b)
+                {
+                    ProfileState.DeveloperToolsEnabled = false;
+                    ShowStatus("Developer Tools disabled. Tap avatar 8x in Settings to re-enable.");
+                    Debug.WriteLine("[DeveloperTools] Developer Tools DISABLED");
+                }
+                else
+                {
+                    // User cancelled, restore toggle state
+                    if (DeveloperModeSwitch != null)
+                        DeveloperModeSwitch.IsToggled = true;
+                }
             }
             else
             {
-                // User cancelled, restore toggle state
-                DeveloperModeSwitch.IsToggled = true;
+                // Re-enabling
+                ProfileState.DeveloperToolsEnabled = true;
+                ShowStatus("Developer Tools enabled");
+                Debug.WriteLine("[DeveloperTools] Developer Tools ENABLED");
             }
         }
-        else
+        catch (Exception ex)
         {
-            // Re-enabling
-            ProfileState.DeveloperToolsEnabled = true;
-            ShowStatus("Developer Tools enabled");
-            Debug.WriteLine("[DeveloperTools] Developer Tools ENABLED");
+            Debug.WriteLine($"[DeveloperTools] OnDeveloperModeToggled error: {ex}");
         }
     }
 
@@ -75,11 +114,22 @@ public partial class DeveloperToolsPage : ContentPage
     {
         try
         {
+            if (_resetService == null)
+            {
+                DatabaseSizeLabel.Text = "N/A";
+                LocalAppDataSizeLabel.Text = "N/A";
+                TotalSizeLabel.Text = "N/A";
+                return;
+            }
+            
             var (dbSize, localAppDataSize, totalSize) = _resetService.GetDataUsageInfo();
             
-            DatabaseSizeLabel.Text = FormatBytes(dbSize);
-            LocalAppDataSizeLabel.Text = FormatBytes(localAppDataSize);
-            TotalSizeLabel.Text = FormatBytes(totalSize);
+            if (DatabaseSizeLabel != null)
+                DatabaseSizeLabel.Text = FormatBytes(dbSize);
+            if (LocalAppDataSizeLabel != null)
+                LocalAppDataSizeLabel.Text = FormatBytes(localAppDataSize);
+            if (TotalSizeLabel != null)
+                TotalSizeLabel.Text = FormatBytes(totalSize);
             
             Debug.WriteLine($"[DeveloperTools] Database size: {FormatBytes(dbSize)}");
             Debug.WriteLine($"[DeveloperTools] LocalAppData size: {FormatBytes(localAppDataSize)}");
@@ -88,6 +138,13 @@ public partial class DeveloperToolsPage : ContentPage
         catch (Exception ex)
         {
             Debug.WriteLine($"[DeveloperTools] Error refreshing usage info: {ex}");
+            try
+            {
+                if (DatabaseSizeLabel != null) DatabaseSizeLabel.Text = "Error";
+                if (LocalAppDataSizeLabel != null) LocalAppDataSizeLabel.Text = "Error";
+                if (TotalSizeLabel != null) TotalSizeLabel.Text = "Error";
+            }
+            catch { }
         }
     }
 
@@ -147,98 +204,30 @@ public partial class DeveloperToolsPage : ContentPage
 
     private async void OnResetDatabaseClicked(object? sender, EventArgs e)
     {
-        var confirm = await this.ShowPopupAsync(
-            new AppModal(
-                "Reset Database",
-                "This will delete all flashcards and reviewers. Your settings and Python environment will be preserved.\n\nThis action cannot be undone!",
-                "Reset Database",
-                "Cancel"));
-
-        if (confirm is bool b && b)
+        try
         {
-            Debug.WriteLine("[DeveloperTools] Resetting database...");
-            var (success, message) = await _resetService.ResetDatabaseOnlyAsync();
-            
-            if (success)
+            if (_resetService == null)
             {
-                await DisplayAlert("Success", message, "OK");
-                await Shell.Current.GoToAsync("///ReviewersPage");
+                await DisplayAlert("Error", "Reset service not available", "OK");
+                return;
             }
-            else
-            {
-                await DisplayAlert("Error", message, "OK");
-            }
-        }
-    }
-
-    private async void OnResetPythonClicked(object? sender, EventArgs e)
-    {
-        var confirm = await this.ShowPopupAsync(
-            new AppModal(
-                "Reset Python Environment",
-                "This will delete the Python installation and AI models. Your database and settings will be preserved.\n\nYou'll need to reinstall Python by clicking 'AI Summarize' again.",
-                "Reset Python",
-                "Cancel"));
-
-        if (confirm is bool b && b)
-        {
-            Debug.WriteLine("[DeveloperTools] Resetting Python environment...");
-            var (success, message) = await _resetService.ResetPythonEnvironmentAsync();
             
-            await DisplayAlert(success ? "Success" : "Error", message, "OK");
-            RefreshUsageInfo();
-        }
-    }
+            var confirm = await this.ShowPopupAsync(
+                new AppModal(
+                    "Reset Database",
+                    "This will delete all flashcards and reviewers. Your settings and Python environment will be preserved.\n\nThis action cannot be undone!",
+                    "Reset Database",
+                    "Cancel"));
 
-    private async void OnResetSettingsClicked(object? sender, EventArgs e)
-    {
-        var confirm = await this.ShowPopupAsync(
-            new AppModal(
-                "Reset Settings",
-                "This will reset all app settings to defaults. Your database and Python environment will be preserved.",
-                "Reset Settings",
-                "Cancel"));
-
-        if (confirm is bool b && b)
-        {
-            Debug.WriteLine("[DeveloperTools] Resetting settings...");
-            var (success, message) = _resetService.ResetSettingsOnly();
-            
-            await DisplayAlert(success ? "Success" : "Error", message, "OK");
-        }
-    }
-
-    private async void OnResetAllDataClicked(object? sender, EventArgs e)
-    {
-        var confirm = await this.ShowPopupAsync(
-            new AppModal(
-                "?? RESET ALL DATA",
-                "This will delete EVERYTHING:\n\n• All flashcards and reviewers\n• All settings\n• Python and AI models\n• All cached data\n\nYou will see the onboarding screens again.\n\nThis action CANNOT be undone!",
-                "DELETE EVERYTHING",
-                "Cancel"));
-
-        if (confirm is bool b && b)
-        {
-            // Double confirm
-            var doubleConfirm = await DisplayAlert(
-                "Final Confirmation",
-                "Are you absolutely sure you want to delete ALL data?",
-                "Yes, Delete Everything",
-                "No, Cancel");
-
-            if (doubleConfirm)
+            if (confirm is bool b && b)
             {
-                Debug.WriteLine("[DeveloperTools] Resetting ALL data...");
-                var (success, message) = await _resetService.ResetAllDataAsync();
+                Debug.WriteLine("[DeveloperTools] Resetting database...");
+                var (success, message) = await _resetService.ResetDatabaseOnlyAsync();
                 
                 if (success)
                 {
-                    await DisplayAlert("Success", 
-                        "All data has been deleted. The app will now restart and show the onboarding screens.", 
-                        "OK");
-                    
-                    // Navigate to onboarding
-                    await Shell.Current.GoToAsync("///OnboardingPage");
+                    await DisplayAlert("Success", message, "OK");
+                    await Shell.Current.GoToAsync("///ReviewersPage");
                 }
                 else
                 {
@@ -246,23 +235,171 @@ public partial class DeveloperToolsPage : ContentPage
                 }
             }
         }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[DeveloperTools] OnResetDatabaseClicked error: {ex}");
+            await DisplayAlert("Error", $"Failed to reset database: {ex.Message}", "OK");
+        }
+    }
+
+    private async void OnResetPythonClicked(object? sender, EventArgs e)
+    {
+        try
+        {
+            if (_resetService == null)
+            {
+                await DisplayAlert("Error", "Reset service not available", "OK");
+                return;
+            }
+            
+            var confirm = await this.ShowPopupAsync(
+                new AppModal(
+                    "Reset Python Environment",
+                    "This will delete the Python installation and AI models. Your database and settings will be preserved.\n\nYou'll need to reinstall Python by clicking 'AI Summarize' again.",
+                    "Reset Python",
+                    "Cancel"));
+
+            if (confirm is bool b && b)
+            {
+                Debug.WriteLine("[DeveloperTools] Resetting Python environment...");
+                var (success, message) = await _resetService.ResetPythonEnvironmentAsync();
+                
+                await DisplayAlert(success ? "Success" : "Error", message, "OK");
+                RefreshUsageInfo();
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[DeveloperTools] OnResetPythonClicked error: {ex}");
+            await DisplayAlert("Error", $"Failed to reset Python: {ex.Message}", "OK");
+        }
+    }
+
+    private async void OnResetSettingsClicked(object? sender, EventArgs e)
+    {
+        try
+        {
+            if (_resetService == null)
+            {
+                await DisplayAlert("Error", "Reset service not available", "OK");
+                return;
+            }
+            
+            var confirm = await this.ShowPopupAsync(
+                new AppModal(
+                    "Reset Settings",
+                    "This will reset all app settings to defaults. Your database and Python environment will be preserved.",
+                    "Reset Settings",
+                    "Cancel"));
+
+            if (confirm is bool b && b)
+            {
+                Debug.WriteLine("[DeveloperTools] Resetting settings...");
+                var (success, message) = _resetService.ResetSettingsOnly();
+                
+                await DisplayAlert(success ? "Success" : "Error", message, "OK");
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[DeveloperTools] OnResetSettingsClicked error: {ex}");
+            await DisplayAlert("Error", $"Failed to reset settings: {ex.Message}", "OK");
+        }
+    }
+
+    private async void OnResetAllDataClicked(object? sender, EventArgs e)
+    {
+        try
+        {
+            if (_resetService == null)
+            {
+                await DisplayAlert("Error", "Reset service not available", "OK");
+                return;
+            }
+            
+            var confirm = await this.ShowPopupAsync(
+                new AppModal(
+                    "?? RESET ALL DATA",
+                    "This will delete EVERYTHING:\n\n• All flashcards and reviewers\n• All settings\n• Python and AI models\n• All cached data\n\nYou will see the onboarding screens again.\n\nThis action CANNOT be undone!",
+                    "DELETE EVERYTHING",
+                    "Cancel"));
+
+            if (confirm is bool b && b)
+            {
+                // Double confirm
+                var doubleConfirm = await DisplayAlert(
+                    "Final Confirmation",
+                    "Are you absolutely sure you want to delete ALL data?",
+                    "Yes, Delete Everything",
+                    "No, Cancel");
+
+                if (doubleConfirm)
+                {
+                    Debug.WriteLine("[DeveloperTools] Resetting ALL data...");
+                    var (success, message) = await _resetService.ResetAllDataAsync();
+                    
+                    if (success)
+                    {
+                        await DisplayAlert("Success", 
+                            "All data has been deleted. The app will now restart and show the onboarding screens.", 
+                            "OK");
+                        
+                        // Navigate to onboarding
+                        await Shell.Current.GoToAsync("///OnboardingPage");
+                    }
+                    else
+                    {
+                        await DisplayAlert("Error", message, "OK");
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[DeveloperTools] OnResetAllDataClicked error: {ex}");
+            await DisplayAlert("Error", $"Failed to reset all data: {ex.Message}", "OK");
+        }
     }
 
     private async void OnCloseClicked(object? sender, EventArgs e)
     {
-        await Navigation.PopAsync();
+        try
+        {
+            await Navigation.PopAsync();
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[DeveloperTools] OnCloseClicked error: {ex}");
+        }
     }
 
     private void ShowStatus(string message)
     {
-        StatusLabel.Text = message;
-        StatusLabel.IsVisible = true;
-        
-        // Hide after 3 seconds
-        _ = Task.Run(async () =>
+        try
         {
-            await Task.Delay(3000);
-            MainThread.BeginInvokeOnMainThread(() => StatusLabel.IsVisible = false);
-        });
+            if (StatusLabel == null) return;
+            
+            StatusLabel.Text = message;
+            StatusLabel.IsVisible = true;
+            
+            // Hide after 3 seconds
+            _ = Task.Run(async () =>
+            {
+                await Task.Delay(3000);
+                MainThread.BeginInvokeOnMainThread(() =>
+                {
+                    try
+                    {
+                        if (StatusLabel != null)
+                            StatusLabel.IsVisible = false;
+                    }
+                    catch { }
+                });
+            });
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[DeveloperTools] ShowStatus error: {ex}");
+        }
     }
 }

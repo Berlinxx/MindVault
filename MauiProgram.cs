@@ -146,22 +146,9 @@ public static class MauiProgram
 #endif
         var app = builder.Build();
 
-        // Ensure MindVault LocalAppData and Python environment are prepared on Windows at startup
-#if WINDOWS
-        _ = Task.Run(async () =>
-        {
-            try
-            {
-                var bootstrapper = app.Services.GetRequiredService<PythonBootstrapper>();
-                // Create folders and extract Python, scripts, and AI model into %LOCALAPPDATA%\MindVault
-                await bootstrapper.EnsurePythonReadyAsync(null, CancellationToken.None);
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine("[MauiProgram] Python bootstrap at startup failed: " + ex.Message);
-            }
-        });
-#endif
+        // NOTE: Python bootstrap is intentionally NOT done at startup.
+        // It should only happen when user navigates to SummarizeContentPage and clicks "AI Summarize".
+        // Running it at startup causes race conditions if user navigates to AI features before extraction completes.
 
         // Kick off reviewer metadata preload (safe, does not touch App services prematurely)
         _ = Task.Run(async () =>
