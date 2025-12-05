@@ -1,8 +1,10 @@
 {
   "profiles": {
     "Windows Machine": {
-      "commandName": "Project",
-      "nativeDebugging": false
+      "commandName": "MsixPackage",
+      "nativeDebugging": false,
+      "alwaysReinstallApp": false,
+      "deployMode": "CopyToDevice"
     }
   }
 }

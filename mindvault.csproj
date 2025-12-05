@@ -12,7 +12,6 @@
 		<ApplicationId>com.companyname.mindvault</ApplicationId>
 		<ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
 		<ApplicationVersion>1</ApplicationVersion>
-		<WindowsPackageType>None</WindowsPackageType>
 		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'">15.0</SupportedOSPlatformVersion>
 		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'maccatalyst'">15.0</SupportedOSPlatformVersion>
 		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">21.0</SupportedOSPlatformVersion>
@@ -49,6 +48,14 @@
 		<AndroidEnableProfiledAot>false</AndroidEnableProfiledAot>
 		<!-- Optionally narrow ABIs in Release during development to speed packaging -->
 		<AndroidSupportedAbis>arm64-v8a;x86_64</AndroidSupportedAbis>
+	</PropertyGroup>
+
+	<!-- Windows MSIX Packaging -->
+	<PropertyGroup Condition="$(TargetFramework.Contains('windows'))">
+		<WindowsPackageType>MSIX</WindowsPackageType>
+		<GenerateAppxPackageOnBuild>true</GenerateAppxPackageOnBuild>
+		<AppxPackageSigningEnabled>true</AppxPackageSigningEnabled>
+		<PackageCertificateThumbprint>83CE283AF351F831151435A5153F5908729C588E</PackageCertificateThumbprint>
 	</PropertyGroup>
 
 	<!-- Keep multi-targeting for all configurations so Windows builds are available.

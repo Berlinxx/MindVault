@@ -1,6 +1,7 @@
 using CommunityToolkit.Maui.Views;
 using mindvault.Controls;
 using System.Text;
+using System.IO;
 using mindvault.Services; // still needed for ServiceHelper/DatabaseService
 using mindvault.Utils;
 using mindvault.Data;
@@ -249,11 +250,11 @@ public partial class SummarizeContentPage : ContentPage
             }
             else
             {
-                // Environment not ready - hide both buttons and show message
+                // Environment not ready - show the install button so user can trigger extraction
                 MainThread.BeginInvokeOnMainThread(() =>
                 {
-                    StatusLabel.Text = "Python + llama required. Use the AI Summarize button on the previous page to install.";
-                    ManualInstallButton.IsVisible = false;
+                    StatusLabel.Text = "Python not installed. Click below to install.";
+                    ManualInstallButton.IsVisible = true;
                     GenerateButton.IsVisible = false;
                 });
             }
@@ -264,7 +265,7 @@ public partial class SummarizeContentPage : ContentPage
             MainThread.BeginInvokeOnMainThread(() =>
             {
                 StatusLabel.Text = "Environment check failed: " + ex.Message;
-                ManualInstallButton.IsVisible = false;
+                ManualInstallButton.IsVisible = true;
                 GenerateButton.IsVisible = false;
             });
         }
@@ -272,12 +273,147 @@ public partial class SummarizeContentPage : ContentPage
 
     async void OnManualInstall(object? sender, TappedEventArgs e)
     {
-        // This button should now be hidden - redirect to AddFlashcardsPage for installation
-        await this.ShowPopupAsync(new AppModal(
-            "Installation Required",
-            "Please return to the previous page and use the AI Summarize button to complete the installation.",
-            "OK"
-        ));
+        // Trigger Python extraction directly from this page
+        try
+        {
+            var bootstrapper = ServiceHelper.GetRequiredService<PythonBootstrapper>();
+            
+            // First check if environment is already healthy (llama might already be installed)
+            StatusLabel.Text = "Checking environment...";
+            ManualInstallButton.IsVisible = false;
+            
+            var alreadyHealthy = await bootstrapper.IsEnvironmentHealthyAsync();
+            if (alreadyHealthy)
+            {
+                StatusLabel.Text = "Ready to generate flashcards";
+                GenerateButton.IsVisible = !string.IsNullOrWhiteSpace(_rawContent);
+                ManualInstallButton.IsVisible = false;
+                return;
+            }
+            
+            // Check if python311.zip exists
+            var zipPath = Path.Combine(AppContext.BaseDirectory, "python311.zip");
+            if (!File.Exists(zipPath))
+            {
+                // Maybe Python is already extracted, just needs setup
+                if (!bootstrapper.TryGetExistingPython(out _))
+                {
+                    await this.ShowPopupAsync(new AppModal(
+                        "Setup Error",
+                        "Python runtime not found. Please ensure 'python311.zip' is in the application folder and restart.",
+                        "OK"
+                    ));
+                    ManualInstallButton.IsVisible = true;
+                    return;
+                }
+            }
+            
+            // Ask user for permission
+            var consent = await this.ShowPopupAsync(new AppModal(
+                "AI Setup Required",
+                "The AI environment needs to be set up for flashcard generation.\n\nWould you like to set it up now?",
+                "Yes", "No"
+            ));
+            
+            if (consent is not bool || !(bool)consent)
+            {
+                ManualInstallButton.IsVisible = true;
+                return; // User declined
+            }
+            
+            // Show loading overlay
+            ShowLoading(true);
+            StatusLabel.Text = "Setting up AI environment...";
+            
+            var progress = new Progress<string>(msg => 
+            { 
+                MainThread.BeginInvokeOnMainThread(() =>
+                {
+                    if (msg.StartsWith("::")) return; // Skip progress markers
+                    StatusLabel.Text = msg;
+                });
+            });
+            
+            // Extract Python and prepare environment
+            await bootstrapper.EnsurePythonReadyAsync(progress, CancellationToken.None);
+            
+            // Check if llama is already available (might be pre-installed in bundled Python)
+            var llamaAvailable = await bootstrapper.IsLlamaAvailableAsync();
+            
+            if (!llamaAvailable)
+            {
+                // Try to ensure llama is ready
+                try
+                {
+                    await bootstrapper.EnsureLlamaReadyAsync(progress, CancellationToken.None);
+                }
+                catch (Exception llamaEx)
+                {
+                    Debug.WriteLine($"[SummarizeContent] Llama setup failed: {llamaEx.Message}");
+                    // Continue anyway - maybe it's not strictly required or will work
+                }
+            }
+            
+            // Verify the environment is now healthy
+            var healthy = await bootstrapper.IsEnvironmentHealthyAsync();
+            
+            ShowLoading(false);
+            
+            if (healthy)
+            {
+                // Success!
+                StatusLabel.Text = "Ready to generate flashcards";
+                GenerateButton.IsVisible = !string.IsNullOrWhiteSpace(_rawContent);
+                ManualInstallButton.IsVisible = false;
+                
+                await this.ShowPopupAsync(new AppModal(
+                    "Setup Complete",
+                    "AI environment is ready. You can now generate flashcards!",
+                    "OK"
+                ));
+            }
+            else
+            {
+                // Check individual components to give specific feedback
+                var pyOk = bootstrapper.TryGetExistingPython(out _);
+                var llamaOk = await bootstrapper.IsLlamaAvailableAsync();
+                
+                if (pyOk && !llamaOk)
+                {
+                    StatusLabel.Text = "Python ready but AI model unavailable.";
+                    await this.ShowPopupAsync(new AppModal(
+                        "Partial Setup",
+                        "Python is installed but the AI component (llama-cpp-python) could not be set up.\n\n" +
+                        "This may be because:\n" +
+                        "• The llama wheel files are missing from the Wheels folder\n" +
+                        "• pip is not available in the bundled Python\n\n" +
+                        "Please ensure the bundled Python includes llama-cpp-python pre-installed.",
+                        "OK"
+                    ));
+                }
+                else
+                {
+                    StatusLabel.Text = "Setup incomplete. Some components may be missing.";
+                }
+                ManualInstallButton.IsVisible = true;
+                GenerateButton.IsVisible = false;
+            }
+        }
+        catch (Exception ex)
+        {
+            ShowLoading(false);
+            Debug.WriteLine($"[SummarizeContent] OnManualInstall error: {ex.Message}");
+            
+            await this.ShowPopupAsync(new AppModal(
+                "Setup Error",
+                $"Installation failed: {ex.Message}\n\nPlease restart the application and try again.",
+                "OK"
+            ));
+            
+            ManualInstallButton.IsVisible = true;
+            GenerateButton.IsVisible = false;
+            StatusLabel.Text = "Setup failed. Click button to retry.";
+        }
     }
 
     async void OnGenerate(object? sender, TappedEventArgs e)
